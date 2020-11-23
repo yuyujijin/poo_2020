@@ -5,6 +5,7 @@ class Main {
 	static Scanner useVal = new Scanner(System.in);
 	static String strVal = "";
 	static Stack<Integer> stack = new Stack<Integer> ();
+	static String[] opes = { "+", "-", "*", "/" };
 	
 	/*
 	 * on cherche à savoir si la chaine est nulle
@@ -29,6 +30,29 @@ class Main {
 		return onlySpaces;
 
 	}
+	
+	/*
+	 * retourne l'operateur, si val en est un sinon null
+	 */
+	static String isOperation(String val) {
+		int len = opes.length;
+
+		for (int i = 0; i < len; i++) {
+			if (val.equals(opes[i]))
+				return opes[i];
+		}
+		return null;
+	}
+	
+	static Integer makeOpe(Integer term1, Integer term2, String ope) {
+		switch (ope) {
+			case "+": return term1 + term2;
+			case "-": return term1 - term2;
+			case "*": return term1 * term2;
+			case "/": return term1 / term2;
+		}
+		return null;
+	}
 
 	public static void main(String[] args) {	
 		while (!strVal.equals("=")) {
@@ -41,12 +65,12 @@ class Main {
 			if (! isNull(strVal)) {
 				//System.out.println('2'+strVal);
 				//si c'est une valeur
-				if(Operation.isOperation(strVal) == null) {
+				if(isOperation(strVal) == null) {
 					System.out.println(strVal);
 					stack.push(Integer.valueOf(strVal));
 				} else{ 
 					
-					stack.push(Operation.makeOpe
+					stack.push(makeOpe
 							(stack.pop(), stack.pop(), strVal));
 					System.out.println(stack.peek());
 				}
