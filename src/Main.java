@@ -1,80 +1,89 @@
-import java.util.Scanner;
-import java.util.Stack;
+import java.util.*;
+import java.util.stream.Collectors;
 
 class Main {
 	static Scanner useVal = new Scanner(System.in);
 	static String strVal = "";
-	static Stack<Integer> stack = new Stack<Integer> ();
-	static String[] opes = { "+", "-", "*", "/" };
-	
-	/*
-	 * on cherche à savoir si la chaine est nulle
-	 * ou si elle ne contient que des espaces
-	 * et on enleve les espaces superflus
-	 * ex : pour "   5    4  " on aura : "54"
-	 */
+	static Stack<Operande> stack = new Stack<> ();
+	static Dictionnaire dico = new Dictionnaire();
+
 	static boolean isNull(String val) {
-		//la valeur n'est pas nulle :
-		if(val == null) return true;
-		
-		int len = val.length();
-		boolean onlySpaces = true;
-
-		for (int i = 0; i < len; i++) {
-			if (val.charAt(i) == ' ')
-				val = val.substring(0,i) + val.substring(i+1);
-			else onlySpaces=false;
-		}
-		//System.out.println('5'+strVal);
-		//System.out.println(!onlySpaces);
-		return onlySpaces;
-
-	}
-	
-	/*
-	 * retourne l'operateur, si val en est un sinon null
-	 */
-	static String isOperation(String val) {
-		int len = opes.length;
-
-		for (int i = 0; i < len; i++) {
-			if (val.equals(opes[i]))
-				return opes[i];
-		}
-		return null;
-	}
-	
-	static Integer makeOpe(Integer term1, Integer term2, String ope) {
-		switch (ope) {
-			case "+": return term1 + term2;
-			case "-": return term1 - term2;
-			case "*": return term1 * term2;
-			case "/": return term1 / term2;
-		}
-		return null;
+		if(val.length() <= 0) return true;
+		return false;
 	}
 
-	public static void main(String[] args) {	
+	private static String withoutSpaces(String s){
+		if(s == null) return "";
+		return s.replaceAll("\\s+","");
+	}
+
+	private static void addOperations(){
+		dico.put(new Pair<>(new Pair<>("+",Nombre.class),2),OperationNombre.getOperationNombrePlus());
+		dico.put(new Pair<>(new Pair<>("-",Nombre.class),2),OperationNombre.getOperationNombreMoins());
+		dico.put(new Pair<>(new Pair<>("*",Nombre.class),2),OperationNombre.getOperationNombreMul());
+		dico.put(new Pair<>(new Pair<>("/",Nombre.class),2),OperationNombre.getOperationNombreDiv());
+		dico.put(new Pair<>(new Pair<>("AND",Booleen.class),2),OperationBooleen.getOperationBooleenEt());
+	}
+
+	public static void main(String[] args) {
+		addOperations();
 		while (!strVal.equals("=")) {
-			
-			System.out.print(">");
-			strVal = useVal.nextLine();
-			//System.out.println('1'+strVal);
+			if(stack.size() > 0) System.out.println(stack.peek());
 
-			//si la valeur n'est pas nulle
-			if (! isNull(strVal)) {
-				//System.out.println('2'+strVal);
-				//si c'est une valeur
-				if(isOperation(strVal) == null) {
-					System.out.println(strVal);
-					stack.push(Integer.valueOf(strVal));
-				} else{ 
-					
-					stack.push(makeOpe
-							(stack.pop(), stack.pop(), strVal));
-					System.out.println(stack.peek());
-				}
+			System.out.print(">");
+			strVal = withoutSpaces(useVal.nextLine());
+
+			//si la valeur est nulle
+			if (isNull(strVal)) continue;
+			/* récuperer l'opération avec le même nom et de même class que le sommet de la pile */
+
+			Operation p = null;
+			if(stack.size() > 0) {
+				Class clss = stack.peek().getClass();
+				p = dico.getOperation(strVal,clss);
 			}
+
+			if(p == null){
+				Operande c = Operande.createOperande(strVal);
+				if(c != null){ stack.add(c); continue; }
+				throw new IllegalArgumentException("Type d'opérande inconnue.");
+			}
+
+			if(p.getArite() > stack.size()) throw new IndexOutOfBoundsException("Pas assez d'élements dans la pile. (operation d'aritée "+p.getArite()
+					+" avec seulement "+stack.size()+ " élements.s dans la pile)");
+
+			stack.push(p.operate(stack.pop(),stack.pop()));
+		}
+	}
+
+	private final static class Dictionnaire{
+		private static Map<Pair<Pair<String,Class>,Integer>,Operation> dico;
+
+		public Dictionnaire(){
+			dico = new HashMap<>();
+		}
+
+		public Operation getOperation(String op, Class c){
+			List l = dico.entrySet().stream().filter(p -> p.getKey().key.key.equals(op) && p.getKey().key.value == c).map(p -> p.getValue()).collect(Collectors.toList());
+			if(l.size() > 0) return (Operation) l.get(0);
+			return null;
+		}
+
+		public void put(Pair<Pair<String,Class>,Integer> p, Operation o){
+			dico.put(p,o);
+		}
+	}
+
+	private final static class Pair<K,V>{
+		private final K key;
+		private final V value;
+
+		public Pair(K k, V v){
+			key = k; value = v;
+		}
+
+		public String toString(){
+			return key.toString()+" _ "+value.toString();
 		}
 	}
 }
