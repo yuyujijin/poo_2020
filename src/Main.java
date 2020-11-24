@@ -18,15 +18,17 @@ class Main {
 	}
 
 	private static void addOperations(){
-		dico.put(new Pair<>(new Pair<>("+",Nombre.class),2),OperationNombre.getOperationNombrePlus());
-		dico.put(new Pair<>(new Pair<>("-",Nombre.class),2),OperationNombre.getOperationNombreMoins());
-		dico.put(new Pair<>(new Pair<>("*",Nombre.class),2),OperationNombre.getOperationNombreMul());
-		dico.put(new Pair<>(new Pair<>("/",Nombre.class),2),OperationNombre.getOperationNombreDiv());
-		dico.put(new Pair<>(new Pair<>("AND",Booleen.class),2),OperationBooleen.getOperationBooleenEt());
+		dico.put("+",Integer.class,2, (x, y) -> (Integer) x.getValue() + (Integer) y.getValue());
+		dico.put("-",Integer.class,2, (x, y) -> (Integer) x.getValue() - (Integer) y.getValue());
+		dico.put("*",Integer.class,2, (x, y) -> (Integer) x.getValue() * (Integer) y.getValue());
+		dico.put("/",Integer.class,2, (x, y) -> (Integer) x.getValue() / (Integer) y.getValue());
+		dico.put("AND",Boolean.class,2, (x, y) -> (Boolean) x.getValue() && (Boolean) y.getValue());
+		dico.put("OR",Boolean.class,2, (x, y) -> (Boolean) x.getValue() || (Boolean) y.getValue());
 	}
 
 	public static void main(String[] args) {
 		addOperations();
+
 		while (!strVal.equals("=")) {
 			if(stack.size() > 0) System.out.println(stack.peek());
 
@@ -35,42 +37,63 @@ class Main {
 
 			//si la valeur est nulle
 			if (isNull(strVal)) continue;
-			/* récuperer l'opération avec le même nom et de même class que le sommet de la pile */
 
-			Operation p = null;
-			if(stack.size() > 0) {
-				Class clss = stack.peek().getClass();
-				p = dico.getOperation(strVal,clss);
-			}
+			Pair<Signature,Operation> pair = null;
+			if(stack.size() > 0) pair = dico.getPair(strVal.toUpperCase(),stack.peek().getType());
 
-			if(p == null){
+			if(pair == null){
 				Operande c = Operande.createOperande(strVal);
 				if(c != null){ stack.add(c); continue; }
 				throw new IllegalArgumentException("Type d'opérande inconnue.");
 			}
 
-			if(p.getArite() > stack.size()) throw new IndexOutOfBoundsException("Pas assez d'élements dans la pile. (operation d'aritée "+p.getArite()
+			if(pair.key.arite > stack.size()) throw new IndexOutOfBoundsException("Pas assez d'élements dans la pile. (operation d'aritée "+0
 					+" avec seulement "+stack.size()+ " élements.s dans la pile)");
+			for(int i = 0; i < pair.key.arite; i++)
+				if(stack.get(i).getType() != pair.key.cls) throw new IllegalArgumentException("L'un des arguments n'est pas du bon type.");
 
-			stack.push(p.operate(stack.pop(),stack.pop()));
+			Operation op = pair.value;
+			Operande res = Operande.createOperande(op.operate(stack.pop(),stack.pop()).toString());
+			stack.push(res);
 		}
 	}
 
 	private final static class Dictionnaire{
-		private static Map<Pair<Pair<String,Class>,Integer>,Operation> dico;
+		private static Map<Signature,Operation> dico;
 
 		public Dictionnaire(){
 			dico = new HashMap<>();
 		}
 
 		public Operation getOperation(String op, Class c){
-			List l = dico.entrySet().stream().filter(p -> p.getKey().key.key.equals(op) && p.getKey().key.value == c).map(p -> p.getValue()).collect(Collectors.toList());
-			if(l.size() > 0) return (Operation) l.get(0);
+			return dico.get(getSignature(op,c));
+		}
+
+		public Signature getSignature(String s, Class c){
+			List l = dico.keySet().stream().filter(sig -> sig.ope.equals(s) && sig.cls == c).collect(Collectors.toList());
+			if(l.size() > 0) return (Signature) l.get(0);
 			return null;
 		}
 
-		public void put(Pair<Pair<String,Class>,Integer> p, Operation o){
-			dico.put(p,o);
+		public Pair getPair(String s, Class c){
+			Signature sig = getSignature(s,c);
+			if(sig == null) return null;
+			return new Pair(sig,dico.get(sig));
+		}
+
+		public void put(String s, Class c, int i, Operation o){
+			Signature sig = new Signature(s,c,i);
+			dico.put(sig,o);
+		}
+	}
+
+	private final static class Signature{
+		private String ope;
+		private Class cls;
+		private int arite;
+
+		public Signature(String s, Class c, int i){
+			ope = s; cls = c; arite = i;
 		}
 	}
 
