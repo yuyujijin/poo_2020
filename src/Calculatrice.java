@@ -1,11 +1,13 @@
+import java.lang.reflect.Type;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public final class Calculatrice {
 	private final Scanner useVal = new Scanner(System.in);
 	private String strVal = "";
-	private Stack<Operande> stack = new Stack<> ();
-	private final Dictionnaire dico = new Dictionnaire();
+	private Stack<Object> stack = new Stack<> ();
+	private Map<String,Map <Signature, Operation>> dico = new HashMap<>();
+
 
 	public Calculatrice(){
 		addOperations();
@@ -17,17 +19,34 @@ public final class Calculatrice {
 		return s.replaceAll("\\s+","");
 	}
 
+	private Map.Entry<Signature,Operation> getCorrespondingOperation(Map<Signature,Operation> m){
+		for(Map.Entry<Signature,Operation> s : m.entrySet()){
+			Signature sig = s.getKey();
+			if(sig.nbArgs > stack.size()) continue;
+			boolean valid = true;
+			for(int i = 0; i < sig.nbArgs; i++) if(stack.get(stack.size() - 1 - i).getClass() != sig.getTypeArgs().get(i)){ valid = false; break; }
+			if(valid) return s;
+		}
+		return null;
+	}
+
 	private void addOperations(){
-		dico.put("+",Integer.class,2, (x, y) -> (Integer) x.getValue() + (Integer) y.getValue());
-		dico.put("-",Integer.class,2, (x, y) -> (Integer) x.getValue() - (Integer) y.getValue());
-		dico.put("*",Integer.class,2, (x, y) -> (Integer) x.getValue() * (Integer) y.getValue());
-		dico.put("/",Integer.class,2, (x, y) -> (Integer) x.getValue() / (Integer) y.getValue());
-		dico.put("AND",Boolean.class,2, (x, y) -> (Boolean) x.getValue() && (Boolean) y.getValue());
-		dico.put("OR",Boolean.class,2, (x, y) -> (Boolean) x.getValue() || (Boolean) y.getValue());
-		dico.put("+",Fraction.class,2, (x, y) -> Fraction.sum((Fraction) x.getValue(), (Fraction) y.getValue()));
-		dico.put("-",Fraction.class,2, (x, y) -> Fraction.substract((Fraction) x.getValue(), (Fraction) y.getValue()));
-		dico.put("*",Fraction.class,2, (x, y) -> Fraction.multiplicate((Fraction) x.getValue(), (Fraction) y.getValue()));
-		dico.put("/",Fraction.class,2, (x, y) -> Fraction.divide((Fraction) x.getValue(), (Fraction) y.getValue()));
+		String[] operations = new String[]{"+", "-","*","/","AND","OR","NOT"};
+		for(String s : operations) dico.put(s, new HashMap<>());
+		dico.get("+").put(new Signature(2,List.of(Integer.class,Integer.class)), args -> (Integer) args[0] + (Integer) args[1]);
+		dico.get("-").put(new Signature(2,List.of(Integer.class,Integer.class)), args -> (Integer) args[0] - (Integer) args[1]);
+		dico.get("*").put(new Signature(2,List.of(Integer.class,Integer.class)), args -> (Integer) args[0] * (Integer) args[1]);
+		dico.get("/").put(new Signature(2,List.of(Integer.class,Integer.class)), args -> (Integer) args[0] / (Integer) args[1]);
+
+		dico.get("AND").put(new Signature(2,List.of(Boolean.class,Boolean.class)), args -> (Boolean) args[0] && (Boolean) args[1]);
+		dico.get("OR").put(new Signature(2,List.of(Boolean.class,Boolean.class)), args -> (Boolean) args[0] || (Boolean) args[1]);
+		dico.get("NOT").put(new Signature(1,List.of(Boolean.class)), args -> !(Boolean) args[0]);
+	}
+
+	private Object[] toArrayInRange(int n){
+		Object[] o = new Object[n];
+		for(int i = 0 ; i < n; i++) o[i] = stack.pop();
+		return o;
 	}
 
 	private void parse(){
@@ -44,28 +63,14 @@ public final class Calculatrice {
 			mots.addAll(Arrays.asList(strVal.trim().split("[ \t]+")));
 
 			for (String s : mots) {
-				Pair<Signature, Operation> pair = null;
-				if (stack.size() > 0) pair = dico.getPair(s.toUpperCase(), stack.peek().getType());
-
-				if (pair == null) {
-					Operande c = Operande.createOperande(s);
-					if (c != null) {
-						stack.push(c);
-						continue;
-					}
-					throw new IllegalArgumentException("Type d'opérande inconnue.");
+				Map m = dico.get(s.toUpperCase());
+				if(m != null){
+					Map.Entry<Signature,Operation> o = getCorrespondingOperation(m);
+					Object obj = null;
+					if(o != null) obj = o.getValue().compute(toArrayInRange(o.getKey().nbArgs));
+					if(obj != null) { stack.push(obj); continue; }
 				}
-
-				if (pair.key.arite > stack.size())
-					throw new IndexOutOfBoundsException("Pas assez d'élements dans la pile. (operation d'aritée " + 0
-							+ " avec seulement " + stack.size() + " élements.s dans la pile)");
-				for (int i = 0; i < pair.key.arite; i++) {
-					if (stack.get(stack.size() - 1 - i).getType() != pair.key.cls)
-						throw new IllegalArgumentException("L'un des arguments n'est pas du bon type.");
-				}
-				Operation op = pair.value;
-				Operande res = Operande.createOperande(op.operate(stack.pop(), stack.pop()).toString());
-				stack.push(res);
+				stack.push(TypeParser.parse(s));
 			}
 		}
 	}
@@ -74,55 +79,40 @@ public final class Calculatrice {
 		Calculatrice c = new Calculatrice();
 	}
 
-	private final static class Dictionnaire{
-		private static Map<Signature,Operation> dico;
-
-		public Dictionnaire(){
-			dico = new HashMap<>();
-		}
-
-		public Operation getOperation(String op, Class c){
-			return dico.get(getSignature(op,c));
-		}
-
-		public Signature getSignature(String s, Class c){
-			List l = dico.keySet().stream().filter(sig -> sig.ope.equals(s) && sig.cls == c).collect(Collectors.toList());
-			if(l.size() > 0) return (Signature) l.get(0);
-			return null;
-		}
-
-		public Pair getPair(String s, Class c){
-			Signature sig = getSignature(s,c);
-			if(sig == null) return null;
-			return new Pair(sig,dico.get(sig));
-		}
-
-		public void put(String s, Class c, int i, Operation o){
-			Signature sig = new Signature(s,c,i);
-			dico.put(sig,o);
-		}
-	}
-
 	private final static class Signature{
-		private String ope;
-		private Class cls;
-		private int arite;
+		private int nbArgs;
+		private List<Class> typeArgs;
 
-		public Signature(String s, Class c, int i){
-			ope = s; cls = c; arite = i;
+		public Signature(int n, List<Class> t){
+			nbArgs = n; typeArgs = new ArrayList<>(t);
 		}
+
+		public int getNbArgs(){ return nbArgs; }
+		public List<Class> getTypeArgs(){ return new ArrayList<>(typeArgs); }
 	}
 
-	private final static class Pair<K,V>{
-		private final K key;
-		private final V value;
+	private final static class TypeParser{
+		private TypeParser(){}
 
-		public Pair(K k, V v){
-			key = k; value = v;
+		public static Object parse(String s){
+			Object o;
+			if((o = parseInt(s)) != null) return o;
+			if((o = parseBool(s)) != null) return o;
+			throw new IllegalArgumentException("Type de l'argument '"+s+"' inconnue.");
 		}
 
-		public String toString(){
-			return key.toString()+" _ "+value.toString();
+		private static Integer parseInt(String s){
+			try{
+				return Integer.parseInt(s);
+			}catch(Exception e){
+				return null;
+			}
+		}
+
+		private static Boolean parseBool(String s){
+			if(s.toLowerCase().equals("true")) return true;
+			if(s.toLowerCase().equals("false")) return false;
+			return null;
 		}
 	}
 }

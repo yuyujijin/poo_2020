@@ -1,3 +1,3 @@
-public interface Operation<T>{
-    T operate(Operande x, Operande y);
+public interface Operation{
+    Object compute(Object ... args);
 }
