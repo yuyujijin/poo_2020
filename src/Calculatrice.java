@@ -2,19 +2,26 @@ import java.lang.reflect.Type;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.util.concurrent.ForkJoinPool.commonPool;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+
 public final class Calculatrice {
 	private final Scanner useVal = new Scanner(System.in);
 	private String strVal = "";
 	// Les objets de stack et histo devrait implementer clonnable...
-	private Stack<Object> stack = new Stack<> ();
-	private Stack<Object> histo = new Stack<> ();
-	private Map <String, Object> variables = new HashMap<>();
+	private Stack<Operande> stack = new Stack<> ();
+	private Stack<Operande> histo = new Stack<> ();
+	private Map <String, Operande> variables = new HashMap<>();
 	private Map<String,Map <Signature, Operation>> dico = new HashMap<>();
 
 
 	public Calculatrice(){
 		addOperations();
-		parse();
+		try{
+			parse();
+		}catch(Exception e){
+			System.out.println(e);
+		}
 	}
 
 	private static String withoutSpaces(String s){
@@ -28,7 +35,7 @@ public final class Calculatrice {
 			if(sig.getNbArgs() > stack.size()) continue;
 			boolean valid = true;
 			for(int i = 0; i < sig.getNbArgs(); i++)
-				if(!sig.getTypeArgs().get(i).isInstance(stack.get(stack.size() - 1 - i))){ valid = false; break; }
+				if(!sig.getTypeArgs().get(i).isInstance(stack.get(stack.size() - 1 - i).getValue())){ valid = false; break; }
 			if(valid) return s;
 		}
 		return null;
@@ -65,15 +72,20 @@ public final class Calculatrice {
 				args -> Fraction.sum(new Fraction((Integer) args[0],1),(Fraction) args[1]));
 	}
 
-	private Object[] toArrayInRange(int n){
-		Object[] o = new Object[n];
-		for(int i = 0 ; i < n; i++) o[i] = stack.pop();
+	private Operande[] toArrayInRange(int n){
+		Operande[] o = new Operande[n];
+		for(int i = 0 ; i < n; i++) o[i] = stack.get(i);
 		return o;
 	}
 
-	private void parse(){
+	private void parse() throws InterruptedException {
 		while (!strVal.equals("=")) {
-			if (stack.size() > 0) System.out.println(stack.peek());
+			//if (stack.size() > 0) System.out.println(stack.peek());
+			if(stack.size() > 0)
+				for(int i = 0; i < stack.size(); i++){
+					System.out.print(stack.get(i)+"\t");
+			}
+			System.out.println();
 
 			System.out.print(">");
 			strVal = useVal.nextLine();
@@ -91,9 +103,12 @@ public final class Calculatrice {
 				Map m = dico.get(s.toUpperCase());
 				if(m != null){
 					Map.Entry<Signature,Operation> o = getCorrespondingOperation(m);
-					Object obj = null;
+					Operande obj = null;
 					// on compute si possible
-					if(o != null) obj = o.getValue().compute(toArrayInRange(o.getKey().getNbArgs()));
+					if(o != null) obj = new Operande.OperandeWithInputs(toArrayInRange(o.getKey().getNbArgs()),o.getValue());
+
+					commonPool().awaitTermination(1000, MILLISECONDS);
+
 					if(obj != null) {
 						// et si la computation a été faite, on push le resultat
 						stack.push(obj);
@@ -114,7 +129,7 @@ public final class Calculatrice {
 						stack.push(variables.get(sub));
 						continue;
 					}
-					Object obj;
+					Operande obj = null;
 					// si on execute la commande 'hist', obj prend la valeur de l'historique demandée
 					if(s.length() > 4 && s.substring(0,4).equals("hist")){
 						int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(")")));
@@ -124,11 +139,17 @@ public final class Calculatrice {
 						int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(")")));
 						obj = stack.get((i >= 0)? i : stack.size() + i);
 					// sinon, on tente de parser le mot lu
+					}else if(s.length() > 6 && s.contains("update")){
+						int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(",")));
+						Operande objet = TypeParser.parse(s.substring(s.indexOf(",") + 1, s.indexOf(")")));
+						stack.get((i >= 0)? i : stack.size() + i).updateValue(objet.getValue());
+
+						commonPool().awaitTermination(1000, MILLISECONDS);
 					}else{
 						obj = TypeParser.parse(s);
 					}
 					// enfin, si on a pu récuperer un objet, on le push dans la pile et dans l'historique (clone...?)
-					stack.push(obj);
+					if(obj != null) stack.push(obj);
 					histo.push(stack.peek());
 				}catch(Exception e){
 					System.out.println(e);
@@ -155,11 +176,11 @@ public final class Calculatrice {
 	private final static class TypeParser{
 		private TypeParser(){}
 
-		public static Object parse(String s){
+		public static Operande parse(String s){
 			Object o;
-			if((o = parseInt(s)) != null) return o;
-			if((o = parseBool(s)) != null) return o;
-			if((o = parseFrac(s)) != null) return o;
+			if((o = parseInt(s)) != null) return new Operande(o);
+			if((o = parseBool(s)) != null) return new Operande(o);
+			if((o = parseFrac(s)) != null) return new Operande(o);
 			throw new IllegalArgumentException("Type de l'argument '"+s+"' inconnue.");
 		}
 
