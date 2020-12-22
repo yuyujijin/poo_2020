@@ -11,7 +11,6 @@ public class Operande implements Flow.Publisher {
     }
 
     public void updateValue(Object value){
-        System.out.println("j'ai update avec : "+value);
         this.value = value;
         output.submit(this.value);
     }

@@ -14,14 +14,22 @@ public final class Calculatrice {
 	private Map <String, Operande> variables = new HashMap<>();
 	private Map<String,Map <Signature, Operation>> dico = new HashMap<>();
 
-
 	public Calculatrice(){
 		addOperations();
+	}
+
+	public void start(){
 		try{
 			parse();
 		}catch(Exception e){
 			System.out.println(e);
 		}
+	}
+
+	public String[] stackToString(){
+		String[] s = new String[stack.size()];
+		for(int i = 0; i < stack.size(); i++) s[i] = stack.get(i).toString();
+		return s;
 	}
 
 	private static String withoutSpaces(String s){
@@ -72,10 +80,75 @@ public final class Calculatrice {
 				args -> Fraction.sum(new Fraction((Integer) args[0],1),(Fraction) args[1]));
 	}
 
+	public boolean updateValue(int i, Object o){
+		if(o == null || stack.get(i).getValue().getClass() != o.getClass()) return false;
+		stack.get(i).updateValue(o);
+		return true;
+	}
+
 	private Operande[] toArrayInRange(int n){
 		Operande[] o = new Operande[n];
-		for(int i = 0 ; i < n; i++) o[i] = stack.get(i);
+		for(int i = 0 ; i < n; i++) o[i] = stack.get(stack.size() - 1 - i);
 		return o;
+	}
+
+	public void addStringToStack(String s) throws InterruptedException{
+		s = s.trim();
+		//on récupère l'opération correspondante (si elle existe)
+		Map m = dico.get(s.toUpperCase());
+		if(m != null){
+			Map.Entry<Signature,Operation> o = getCorrespondingOperation(m);
+			Operande obj = null;
+			// on compute si possible
+			if(o != null) obj = new Operande.OperandeWithInputs(toArrayInRange(o.getKey().getNbArgs()),o.getValue());
+
+			commonPool().awaitTermination(1000, MILLISECONDS);
+
+			if(obj != null) {
+				// et si la computation a été faite, on push le resultat
+				stack.push(obj);
+				histo.push(stack.peek());
+				return; }
+		}
+		// dans le cas ou on le mot ne correspond a aucune opération connue
+		try{
+			// si le mot commence par '!', on stock une variable avec en nom le reste du mot (sans le '!')
+			if(s.charAt(0) == '!'){
+				String sub = s.substring(1, s.length());
+				variables.put(sub, stack.pop());
+				return;
+			}
+			// si le mot commence par '?', on empile le valeur de la variable stockée
+			if(s.charAt(0) == '?'){
+				String sub = s.substring(1, s.length());
+				stack.push(variables.get(sub));
+				return;
+			}
+			Operande obj = null;
+			// si on execute la commande 'hist', obj prend la valeur de l'historique demandée
+			if(s.length() > 4 && s.substring(0,4).equals("hist")){
+				int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(")")));
+				obj = histo.get((i >= 0)? i : histo.size() + i);
+				// 'pile', obj prend la valeur de la pile demandée
+			}else if(s.length() > 4 && s.contains("pile")){
+				int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(")")));
+				obj = stack.get((i >= 0)? i : stack.size() + i);
+				// sinon, on tente de parser le mot lu
+			}else if(s.length() > 6 && s.contains("update")){
+				int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(",")));
+				Operande objet = TypeParser.parse(s.substring(s.indexOf(",") + 1, s.indexOf(")")));
+				updateValue((i >= 0)? i : stack.size() + i,objet);
+
+				commonPool().awaitTermination(1000, MILLISECONDS);
+			}else{
+				obj = TypeParser.parse(s);
+			}
+			// enfin, si on a pu récuperer un objet, on le push dans la pile et dans l'historique (clone...?)
+			if(obj != null) stack.push(obj);
+			histo.push(stack.peek());
+		}catch(Exception e){
+			System.out.println(e);
+		}
 	}
 
 	private void parse() throws InterruptedException {
@@ -98,62 +171,7 @@ public final class Calculatrice {
 
 			//pour chaque mot dans la ligne que l'on vient de rentrer
 			for (String s : mots) {
-				s = s.trim();
-				//on récupère l'opération correspondante (si elle existe)
-				Map m = dico.get(s.toUpperCase());
-				if(m != null){
-					Map.Entry<Signature,Operation> o = getCorrespondingOperation(m);
-					Operande obj = null;
-					// on compute si possible
-					if(o != null) obj = new Operande.OperandeWithInputs(toArrayInRange(o.getKey().getNbArgs()),o.getValue());
-
-					commonPool().awaitTermination(1000, MILLISECONDS);
-
-					if(obj != null) {
-						// et si la computation a été faite, on push le resultat
-						stack.push(obj);
-						histo.push(stack.peek());
-						continue; }
-				}
-				// dans le cas ou on le mot ne correspond a aucune opération connue
-				try{
-					// si le mot commence par '!', on stock une variable avec en nom le reste du mot (sans le '!')
-					if(s.charAt(0) == '!'){
-						String sub = s.substring(1, s.length());
-						variables.put(sub, stack.pop());
-						continue;
-					}
-					// si le mot commence par '?', on empile le valeur de la variable stockée
-					if(s.charAt(0) == '?'){
-						String sub = s.substring(1, s.length());
-						stack.push(variables.get(sub));
-						continue;
-					}
-					Operande obj = null;
-					// si on execute la commande 'hist', obj prend la valeur de l'historique demandée
-					if(s.length() > 4 && s.substring(0,4).equals("hist")){
-						int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(")")));
-						obj = histo.get((i >= 0)? i : histo.size() + i);
-					// 'pile', obj prend la valeur de la pile demandée
-					}else if(s.length() > 4 && s.contains("pile")){
-						int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(")")));
-						obj = stack.get((i >= 0)? i : stack.size() + i);
-					// sinon, on tente de parser le mot lu
-					}else if(s.length() > 6 && s.contains("update")){
-						int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(",")));
-						Operande objet = TypeParser.parse(s.substring(s.indexOf(",") + 1, s.indexOf(")")));
-						stack.get((i >= 0)? i : stack.size() + i).updateValue(objet.getValue());
-
-						commonPool().awaitTermination(1000, MILLISECONDS);
-					}else{
-						obj = TypeParser.parse(s);
-					}
-					// enfin, si on a pu récuperer un objet, on le push dans la pile et dans l'historique (clone...?)
-					if(obj != null) stack.push(obj);
-					histo.push(stack.peek());
-				}catch(Exception e){
-					System.out.println(e);
-				}
+				addStringToStack(s);
 			}
 		}
 	}
@@ -173,7 +191,7 @@ public final class Calculatrice {
 		public List<Class> getTypeArgs(){ return new ArrayList<>(typeArgs); }
 	}
 
-	private final static class TypeParser{
+	public final static class TypeParser{
 		private TypeParser(){}
 
 		public static Operande parse(String s){
