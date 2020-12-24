@@ -10,14 +10,20 @@ public class Operande implements Flow.Publisher {
         this.value = value;
     }
 
+    public boolean isSubscribed(){
+        return output.hasSubscribers();
+    }
+
     public void updateValue(Object value){
         this.value = value;
         output.submit(this.value);
+
     }
 
     public Object getValue(){
         return value;
     }
+    public String valueClassToString(){ return value.getClass().getSimpleName(); }
 
     @Override
     public void subscribe(Flow.Subscriber subscriber) {
@@ -25,12 +31,15 @@ public class Operande implements Flow.Publisher {
         output.submit(this.value);
     }
 
+    public void unsubscribe(){
+        output.subscribe(null);
+    }
+
     public String toString(){
         return value.toString();
     }
 
     public static final class OperandeWithInputs extends Operande{
-        private Flow.Subscription subscription;
 
         public OperandeWithInputs(Operande[] operandes, Operation operation) {
             super(null);
@@ -45,7 +54,11 @@ public class Operande implements Flow.Publisher {
             for(int i = 0; i < operandes.length; i++) operandes[i].subscribe(inputs[i]);
         }
 
-        public class FanInSubscriber<T> implements Flow.Subscriber<T> {
+        public void deleteSubs(){
+            for(FanInSubscriber f : inputs) f.subscription.cancel();
+        }
+
+        public class FanInSubscriber<T> implements Flow.Subscriber<T>{
             private final Consumer<T> store;
             private Flow.Subscription subscription;
 

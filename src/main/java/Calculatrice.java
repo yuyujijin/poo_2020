@@ -13,6 +13,7 @@ public final class Calculatrice {
 	private Stack<Operande> histo = new Stack<> ();
 	private Map <String, Operande> variables = new HashMap<>();
 	private Map<String,Map <Signature, Operation>> dico = new HashMap<>();
+	private Set<Class> types;
 
 	public Calculatrice(){
 		addOperations();
@@ -26,10 +27,8 @@ public final class Calculatrice {
 		}
 	}
 
-	public String[] stackToString(){
-		String[] s = new String[stack.size()];
-		for(int i = 0; i < stack.size(); i++) s[i] = stack.get(i).toString();
-		return s;
+	public Operande[] stackToArray(){
+		return stack.toArray(new Operande[stack.size()]);
 	}
 
 	private static String withoutSpaces(String s){
@@ -50,6 +49,7 @@ public final class Calculatrice {
 	}
 
 	private void addOperations(){
+		types = new HashSet<>();
 		String[] operations = new String[]{"+", "-","*","/","AND","OR","NOT","^"};
 		for(String s : operations) dico.put(s, new HashMap<>());
 		// opérations usuelles sur les entiers
@@ -61,6 +61,7 @@ public final class Calculatrice {
 				args -> (Integer) args[0] * (Integer) args[1]);
 		dico.get("/").put(new Signature(List.of(Integer.class,Integer.class)),
 				args -> (Integer) args[0] / (Integer) args[1]);
+		types.add(Integer.class);
 
 		// opérations 'et' 'ou' 'non' sur les booléens
 		dico.get("AND").put(new Signature(List.of(Boolean.class,Boolean.class)),
@@ -69,6 +70,7 @@ public final class Calculatrice {
 				args -> (Boolean) args[0] || (Boolean) args[1]);
 		dico.get("NOT").put(new Signature(List.of(Boolean.class)),
 				args -> !(Boolean) args[0]);
+		types.add(Boolean.class);
 
 		// opérations usuelles sur les fractions
 		dico.get("+").put(new Signature(List.of(Fraction.class,Fraction.class)),
@@ -78,12 +80,24 @@ public final class Calculatrice {
 				args -> Fraction.sum((Fraction) args[0],new Fraction((Integer) args[1],1)));
 		dico.get("+").put(new Signature(List.of(Integer.class,Fraction.class)),
 				args -> Fraction.sum(new Fraction((Integer) args[0],1),(Fraction) args[1]));
+		types.add(Fraction.class);
 	}
 
-	public boolean updateValue(int i, Object o){
-		if(o == null || stack.get(i).getValue().getClass() != o.getClass()) return false;
+	public HashSet getAvailableTypes(){
+		return new HashSet(types);
+	}
+
+	public void removeValue(int i){
+		if(stack.get(i).isSubscribed()) throw new IllegalStateException(stack.get(i)+" a sa valeur utilisée.");
+		if(stack.get(i) instanceof Operande.OperandeWithInputs)
+			((Operande.OperandeWithInputs) stack.get(i)).deleteSubs();
+		stack.remove(i);
+	}
+
+	public void updateValue(int i, Object o){
+		if(o == null || stack.get(i).getValue().getClass() != o.getClass())
+			throw new IllegalArgumentException("Type de l'argument '"+o+"' du mauvais type.");
 		stack.get(i).updateValue(o);
-		return true;
 	}
 
 	private Operande[] toArrayInRange(int n){
