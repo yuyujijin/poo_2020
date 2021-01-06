@@ -172,7 +172,8 @@ public final class CalculatorView extends Application {
         type.setBackground(new Background(new BackgroundFill(Color.RED,CornerRadii.EMPTY,Insets.EMPTY)));
         type.setPadding(new Insets(5,10,5,10));
 
-        Text typeText = new Text((op instanceof Token)? ((Token) op).valueClassToString() : op.getClass().getSimpleName());
+        Text typeText = new Text((op instanceof Token)?
+                ((Token) op).getValue().getClass().getSimpleName() : op.getClass().getSimpleName());
         typeText.setFont(Font.font ("Verdana", FontWeight.BLACK.BOLD, 12));
         typeText.setFill(Color.WHITE);
         type.getChildren().add(typeText);

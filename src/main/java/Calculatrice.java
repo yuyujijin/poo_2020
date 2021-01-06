@@ -82,25 +82,29 @@ public final class Calculatrice {
 		return new HashSet(types);
 	}
 
-	public void removeValue(int i){
-		if(histo.get(i).isSubscribed()) throw new IllegalStateException(histo.get(i)+" a sa valeur utilisée.");
-		if(histo.get(i) instanceof Token.OperationToken)
-			((Token.OperationToken) histo.get(i)).deleteSubs();
-		histo.remove(i);
-	}
-
 	public void updateValue(int i, Object o){
 		if(o == null)
 			throw new IndexOutOfBoundsException();
-		if(histo.get(i) instanceof Token.OperationToken)
-			throw new IllegalArgumentException();
-		((Token.OperandToken) histo.get(i)).updateValue(o);
+		histo.set(i,new Token.OperandToken(o));
+		updateHisto();
+		
 	}
 
 	private Object[] toArrayInRange(int n){
 		Object[] o = new Object[n];
 		for(int i = 0 ; i < n; i++) o[i] = stack.pop();
 		return o;
+	}
+
+	private void updateHisto(){
+		for(int i = 0; i < histo.size(); i++){
+			if(histo.get(i) instanceof Token.OperationToken){
+				Token[] t = new Token[histo.size() - i + 1];
+				for(int j = 0 ; j < histo.size() - i + 1; j++) t[j] = histo.get(j);
+				Collections.reverse(Arrays.asList(t));
+				((Token.OperationToken) histo.get(i)).compute(t);
+			}
+		}
 	}
 
 	public void addStringToStack(String phrase) throws InterruptedException{
@@ -124,9 +128,8 @@ public final class Calculatrice {
 				if (obj != null) {
 					// et si la computation a été faite, on push le resultat
 					stack.push(obj);
-					Token[] t = histo.subList(histo.size() - o.getKey().getNbArgs(),
-							histo.size()).toArray(new Token[o.getKey().getNbArgs()]);
-					histo.add(new Token.OperationToken(t,o.getValue(),s));
+					histo.add(new Token.OperationToken(o.getValue()));
+					updateHisto();
 					return;
 				}
 			}
@@ -193,6 +196,7 @@ public final class Calculatrice {
 
 	public static void main(String[] args) {
 		Calculatrice c = new Calculatrice();
+		c.start();
 	}
 
 	private final static class Signature{
