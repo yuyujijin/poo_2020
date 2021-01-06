@@ -1,17 +1,12 @@
-import java.lang.reflect.Type;
 import java.util.*;
-import java.util.stream.Collectors;
-
-import static java.util.concurrent.ForkJoinPool.commonPool;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public final class Calculatrice {
 	private final Scanner useVal = new Scanner(System.in);
 	private String strVal = "";
 	// Les objets de stack et histo devrait implementer clonnable...
-	private Stack<Operande> stack = new Stack<> ();
-	private Stack<Operande> histo = new Stack<> ();
-	private Map <String, Operande> variables = new HashMap<>();
+	private Stack<Object> stack = new Stack<>();
+	private List<Token> histo = new Stack<> ();
+	private Map <String, Token.RecallToken> variables = new HashMap<>();
 	private Map<String,Map <Signature, Operation>> dico = new HashMap<>();
 	private Set<Class> types;
 
@@ -27,9 +22,9 @@ public final class Calculatrice {
 		}
 	}
 
-	public Operande[] stackToArray(){
-		return stack.toArray(new Operande[stack.size()]);
-	}
+	public Object[] stackToArray(){ return stack.toArray(new Object[stack.size()]); }
+	public Token[] histToArray(){ return histo.toArray(new Token[histo.size()]); }
+	public Set<Map.Entry<String, Token.RecallToken>> varToArray(){ return variables.entrySet(); }
 
 	private static String withoutSpaces(String s){
 		if(s == null) return "";
@@ -42,7 +37,7 @@ public final class Calculatrice {
 			if(sig.getNbArgs() > stack.size()) continue;
 			boolean valid = true;
 			for(int i = 0; i < sig.getNbArgs(); i++)
-				if(!sig.getTypeArgs().get(i).isInstance(stack.get(stack.size() - 1 - i).getValue())){ valid = false; break; }
+				if(!sig.getTypeArgs().get(i).isInstance(stack.get(stack.size() - 1 - i))){ valid = false; break; }
 			if(valid) return s;
 		}
 		return null;
@@ -88,80 +83,94 @@ public final class Calculatrice {
 	}
 
 	public void removeValue(int i){
-		if(stack.get(i).isSubscribed()) throw new IllegalStateException(stack.get(i)+" a sa valeur utilisée.");
-		if(stack.get(i) instanceof Operande.OperandeWithInputs)
-			((Operande.OperandeWithInputs) stack.get(i)).deleteSubs();
-		stack.remove(i);
+		if(histo.get(i).isSubscribed()) throw new IllegalStateException(histo.get(i)+" a sa valeur utilisée.");
+		if(histo.get(i) instanceof Token.OperationToken)
+			((Token.OperationToken) histo.get(i)).deleteSubs();
+		histo.remove(i);
 	}
 
 	public void updateValue(int i, Object o){
-		if(o == null || stack.get(i).getValue().getClass() != o.getClass())
-			throw new IllegalArgumentException("Type de l'argument '"+o+"' du mauvais type.");
-		stack.get(i).updateValue(o);
+		if(o == null)
+			throw new IndexOutOfBoundsException();
+		if(histo.get(i) instanceof Token.OperationToken)
+			throw new IllegalArgumentException();
+		((Token.OperandToken) histo.get(i)).updateValue(o);
 	}
 
-	private Operande[] toArrayInRange(int n){
-		Operande[] o = new Operande[n];
-		for(int i = 0 ; i < n; i++) o[i] = stack.get(stack.size() - 1 - i);
+	private Object[] toArrayInRange(int n){
+		Object[] o = new Object[n];
+		for(int i = 0 ; i < n; i++) o[i] = stack.pop();
 		return o;
 	}
 
-	public void addStringToStack(String s) throws InterruptedException{
-		s = s.trim();
-		//on récupère l'opération correspondante (si elle existe)
-		Map m = dico.get(s.toUpperCase());
-		if(m != null){
-			Map.Entry<Signature,Operation> o = getCorrespondingOperation(m);
-			Operande obj = null;
-			// on compute si possible
-			if(o != null) obj = new Operande.OperandeWithInputs(toArrayInRange(o.getKey().getNbArgs()),o.getValue());
+	public void addStringToStack(String phrase) throws InterruptedException{
+		if (withoutSpaces(phrase).length() <= 0) return;
 
-			commonPool().awaitTermination(1000, MILLISECONDS);
+		Stack<String> mots = new Stack<>();
+		mots.addAll(Arrays.asList(phrase.trim().split("[ \t]+")));
 
-			if(obj != null) {
-				// et si la computation a été faite, on push le resultat
-				stack.push(obj);
-				histo.push(stack.peek());
-				return; }
-		}
-		// dans le cas ou on le mot ne correspond a aucune opération connue
-		try{
-			// si le mot commence par '!', on stock une variable avec en nom le reste du mot (sans le '!')
-			if(s.charAt(0) == '!'){
-				String sub = s.substring(1, s.length());
-				variables.put(sub, stack.pop());
-				return;
-			}
-			// si le mot commence par '?', on empile le valeur de la variable stockée
-			if(s.charAt(0) == '?'){
-				String sub = s.substring(1, s.length());
-				stack.push(variables.get(sub));
-				return;
-			}
-			Operande obj = null;
-			// si on execute la commande 'hist', obj prend la valeur de l'historique demandée
-			if(s.length() > 4 && s.substring(0,4).equals("hist")){
-				int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(")")));
-				obj = histo.get((i >= 0)? i : histo.size() + i);
-				// 'pile', obj prend la valeur de la pile demandée
-			}else if(s.length() > 4 && s.contains("pile")){
-				int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(")")));
-				obj = stack.get((i >= 0)? i : stack.size() + i);
-				// sinon, on tente de parser le mot lu
-			}else if(s.length() > 6 && s.contains("update")){
-				int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(",")));
-				Operande objet = TypeParser.parse(s.substring(s.indexOf(",") + 1, s.indexOf(")")));
-				updateValue((i >= 0)? i : stack.size() + i,objet);
+		//pour chaque mot dans la ligne que l'on vient de rentrer
+		for (String s : mots) {
+			s = s.trim();
+			//on récupère l'opération correspondante (si elle existe)
+			Map m = dico.get(s.toUpperCase());
+			if (m != null) {
+				Map.Entry<Signature, Operation> o = getCorrespondingOperation(m);
+				 Object obj = null;
+				// on compute si possible
+				if (o != null)
+					obj = o.getValue().compute(toArrayInRange(o.getKey().getNbArgs()));
 
-				commonPool().awaitTermination(1000, MILLISECONDS);
-			}else{
-				obj = TypeParser.parse(s);
+				if (obj != null) {
+					// et si la computation a été faite, on push le resultat
+					stack.push(obj);
+					Token[] t = histo.subList(histo.size() - o.getKey().getNbArgs(),
+							histo.size()).toArray(new Token[o.getKey().getNbArgs()]);
+					histo.add(new Token.OperationToken(t,o.getValue(),s));
+					return;
+				}
 			}
-			// enfin, si on a pu récuperer un objet, on le push dans la pile et dans l'historique (clone...?)
-			if(obj != null) stack.push(obj);
-			histo.push(stack.peek());
-		}catch(Exception e){
-			System.out.println(e);
+			// dans le cas ou on le mot ne correspond a aucune opération connue
+			try {
+				// si le mot commence par '!', on stock une variable avec en nom le reste du mot (sans le '!')
+				if (s.charAt(0) == '!') {
+					String sub = s.substring(1, s.length());
+					stack.pop();
+					variables.put(sub, new Token.RecallToken(histo.get(histo.size() - 1)));
+					return;
+				}
+				// si le mot commence par '?', on empile le valeur de la variable stockée
+				if (s.charAt(0) == '?') {
+					String sub = s.substring(1, s.length());
+					stack.push(variables.get(sub).getValue());
+					return;
+				}
+				// si on execute la commande 'hist', obj prend la valeur de l'historique demandée
+				if (s.length() > 4 && s.substring(0, 4).equals("hist")) {
+					int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(")")));
+					// On créer une 'copie' de l'opérande (une opérande sans inputs)
+					Token recall = new Token.RecallToken(histo.get((i >= 0) ? i : histo.size() + i));
+					stack.push(recall.getValue());
+					histo.add(recall);
+					// 'pile', obj prend la valeur de la pile demandée
+				} else if (s.length() > 4 && s.contains("pile")) {
+					int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(")")));
+					// On créer une 'copie' de l'opérande (une opérande sans inputs)
+					Token op = new Token.OperandToken(stack.get((i >= 0) ? i : stack.size() + i));
+					stack.push(op.getValue());
+					histo.add(op);
+					// sinon, on tente de parser le mot lu
+				} else {
+					Object obj = TypeParser.parse(s);
+					if (obj != null){
+						stack.push(obj);
+						histo.add(new Token.OperandToken(obj));
+					}
+				}
+				// enfin, si on a pu récuperer un objet, on le push dans la pile et dans l'historique (clone...?)
+			} catch (Exception e) {
+				System.out.println(e);
+			}
 		}
 	}
 
@@ -178,15 +187,7 @@ public final class Calculatrice {
 			strVal = useVal.nextLine();
 
 			//si la valeur est nulle
-			if (withoutSpaces(strVal).length() <= 0) continue;
-
-			Stack<String> mots = new Stack<>();
-			mots.addAll(Arrays.asList(strVal.trim().split("[ \t]+")));
-
-			//pour chaque mot dans la ligne que l'on vient de rentrer
-			for (String s : mots) {
-				addStringToStack(s);
-			}
+			addStringToStack(strVal);
 		}
 	}
 
@@ -208,11 +209,11 @@ public final class Calculatrice {
 	public final static class TypeParser{
 		private TypeParser(){}
 
-		public static Operande parse(String s){
+		public static Object parse(String s){
 			Object o;
-			if((o = parseInt(s)) != null) return new Operande(o);
-			if((o = parseBool(s)) != null) return new Operande(o);
-			if((o = parseFrac(s)) != null) return new Operande(o);
+			if((o = parseInt(s)) != null) return o;
+			if((o = parseBool(s)) != null) return o;
+			if((o = parseFrac(s)) != null) return o;
 			throw new IllegalArgumentException("Type de l'argument '"+s+"' inconnue.");
 		}
 
