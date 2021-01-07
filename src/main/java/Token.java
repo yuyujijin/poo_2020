@@ -1,3 +1,4 @@
+import java.util.Optional;
 import java.util.concurrent.Flow;
 import java.util.concurrent.SubmissionPublisher;
 import java.util.function.Consumer;
@@ -16,6 +17,17 @@ public abstract class Token implements Flow.Publisher {
         output.subscribe(subscriber);
         output.submit(getValue());
     }
+    protected final Optional<Flow.Subscriber> unsubscribe(){
+        if(output.hasSubscribers()) {
+            Flow.Subscriber s = (Flow.Subscriber) output.getSubscribers().get(0);
+            output.close();
+            return Optional.of(s);
+        }
+        output.close();
+        return Optional.empty();
+    }
+
+    public abstract Optional<Flow.Subscriber> delete();
 
     protected void submit(Object o){
         output.submit(o);
@@ -36,6 +48,10 @@ public abstract class Token implements Flow.Publisher {
 
         public OperandToken(Object o){
             this.value = o;
+        }
+
+        public final Optional<Flow.Subscriber> delete(){
+            return super.unsubscribe();
         }
 
         public void updateValue(Object o){
@@ -67,6 +83,15 @@ public abstract class Token implements Flow.Publisher {
             for(int i = 0; i < operandes.length; i++) operandes[i].subscribe(inputs[i]);
         }
 
+        public final Optional<Flow.Subscriber> delete(){
+            deleteSubs();
+            return super.unsubscribe();
+        }
+
+        public void deleteSubs(){
+            for(FanInSubscriber f : inputs) f.subscription.cancel();
+        }
+
         public Object getValue(){
             return operation.compute(values);
         }
@@ -75,9 +100,6 @@ public abstract class Token implements Flow.Publisher {
             return "("+operationName+") "+super.toString();
         }
 
-        public void deleteSubs(){
-            for(FanInSubscriber f : inputs) f.subscription.cancel();
-        }
 
         private final class FanInSubscriber<T> implements Flow.Subscriber<T>{
             private final Consumer<T> store;
@@ -133,6 +155,12 @@ public abstract class Token implements Flow.Publisher {
             t.subscribe(this);
             value = t.getValue();
         }
+
+        public final Optional<Flow.Subscriber> delete(){
+            subscription.cancel();
+            return super.unsubscribe();
+        }
+
         @Override
         public Object getValue() {
             return value;

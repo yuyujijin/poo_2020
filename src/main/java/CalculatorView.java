@@ -24,6 +24,8 @@ public final class CalculatorView extends Application {
     private int WIDTH, HEIGHT;
     private Color[] colors = new Color[]{ Color.web("dfdfdf"), Color.web("f0f0f0") };
     private int colorsIndex = 0;
+    private ScrollPane histScroll;
+    private VBox historiqueDisplay;
 
     public void start(Stage primaryStage) throws Exception {
         // On definit la taille, et on créer un nouveau modèle
@@ -35,7 +37,7 @@ public final class CalculatorView extends Application {
         stackScroll.setFitToWidth(true);
         stackScroll.setPrefHeight(HEIGHT * 0.4);
 
-        ScrollPane histScroll = new ScrollPane();
+        histScroll = new ScrollPane();
         histScroll.setFitToWidth(true);
 
         ScrollPane varScroll = new ScrollPane();
@@ -43,7 +45,7 @@ public final class CalculatorView extends Application {
 
         // Puis on créer les 3 VBox pour afficher verticalement les valeurs dedans
         VBox stackDisplay = createStackDisplay(HEIGHT *  .8);
-        VBox historiqueDisplay = createStackDisplay(HEIGHT);
+        historiqueDisplay = createStackDisplay(HEIGHT);
         VBox varDisplay = createStackDisplay(HEIGHT);
 
         stackScroll.setContent(stackDisplay);
@@ -140,7 +142,7 @@ public final class CalculatorView extends Application {
 
     private StackPane createStackItem(Object op, Color c,int index, boolean modifiable){
         Node t;
-        if(op instanceof Token.OperationToken || !modifiable) {
+        if(!modifiable) {
             t = new Text(op.toString());
             ((Text) t).setFont(Font.font("Verdana", 12));
         }else {
@@ -152,11 +154,11 @@ public final class CalculatorView extends Application {
                     if (ke.getCode().equals(KeyCode.ENTER) && ((TextField) t).getText().length() > 0) {
                         String value = ((TextField) t).getText();
                         try{
-                            modele.updateValue(index, Calculatrice.TypeParser.parse(value));
+                            modele.updateValue(index, value);
                         }catch(Exception e){
                             System.out.println(e);
                         }
-                        //printStack(historiqueDisplay,histScroll,modele.histToArray(),true);
+                        printStack(historiqueDisplay,histScroll,modele.histToArray(),true);
                     }
                 }
             });

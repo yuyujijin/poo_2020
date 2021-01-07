@@ -1,4 +1,5 @@
 import java.util.*;
+import java.util.concurrent.Flow;
 
 public final class Calculatrice {
 	private final Scanner useVal = new Scanner(System.in);
@@ -31,16 +32,20 @@ public final class Calculatrice {
 		return s.replaceAll("\\s+","");
 	}
 
-	private Map.Entry<Signature,Operation> getCorrespondingOperation(Map<Signature,Operation> m){
+	private Optional<Map.Entry<Signature,Operation>> getCorrespondingOperation(Map<Signature,Operation> m, Object... c){
 		for(Map.Entry<Signature,Operation> s : m.entrySet()){
 			Signature sig = s.getKey();
-			if(sig.getNbArgs() > stack.size()) continue;
+			if(sig.getNbArgs() > c.length) continue;
 			boolean valid = true;
-			for(int i = 0; i < sig.getNbArgs(); i++)
-				if(!sig.getTypeArgs().get(i).isInstance(stack.get(stack.size() - 1 - i))){ valid = false; break; }
-			if(valid) return s;
+			for(int i = 0; i < sig.getNbArgs(); i++) {
+				if (!sig.getTypeArgs().get(i).isInstance(c[c.length - 1 - i])) {
+					valid = false;
+					break;
+				}
+			}
+			if(valid) return Optional.of(s);
 		}
-		return null;
+		return Optional.empty();
 	}
 
 	private void addOperations(){
@@ -82,19 +87,36 @@ public final class Calculatrice {
 		return new HashSet(types);
 	}
 
-	public void removeValue(int i){
-		if(histo.get(i).isSubscribed()) throw new IllegalStateException(histo.get(i)+" a sa valeur utilisée.");
-		if(histo.get(i) instanceof Token.OperationToken)
-			((Token.OperationToken) histo.get(i)).deleteSubs();
-		histo.remove(i);
-	}
-
-	public void updateValue(int i, Object o){
-		if(o == null)
+	public void updateValue(int i, String s){
+		// TODO NULL POINTER LORS DE LA MODIFICATION DE VALEUR
+		if(s == null || s.length() == 0)
 			throw new IndexOutOfBoundsException();
-		if(histo.get(i) instanceof Token.OperationToken)
-			throw new IllegalArgumentException();
-		((Token.OperandToken) histo.get(i)).updateValue(o);
+
+		Map m = dico.get(s.toUpperCase());
+		if (m != null) {
+			Optional<Map.Entry<Signature, Operation>> operation = getCorrespondingOperation(m,
+					new ArrayList<Token>(histo).stream().map(x -> x.getValue()).limit(i).toArray());
+			// on compute si possible
+			if (operation.isPresent()) {
+				Map.Entry<Signature, Operation> sigop = operation.get();
+				// Si l'opération n'a pas retourné 'null'
+				// On récupère les n inputs, et on créer un nouveau OperationToken avec ces derniers
+				// qu'on ajoute a l'historique
+				Optional<Flow.Subscriber> sub = histo.get(i).delete();
+				Token[] t = histo.subList(i - sigop.getKey().getNbArgs(),
+						i).toArray(new Token[sigop.getKey().getNbArgs()]);
+				histo.set(i,new Token.OperationToken(t,sigop.getValue(),s));
+				if(sub.isPresent()) histo.get(i).subscribe(sub.get());
+				return;
+			}
+		}
+		Optional<Object> opt = TypeParser.parse(s);
+		if(opt.isPresent()){
+			Optional<Flow.Subscriber> sub = histo.get(i).delete();
+			histo.set(i,new Token.OperandToken(opt.get()));
+			if(sub.isPresent()) histo.get(i).subscribe(sub.get());
+			return;
+		}
 	}
 
 	private Object[] toArrayInRange(int n){
@@ -113,42 +135,31 @@ public final class Calculatrice {
 		for (String s : mots) {
 			s = s.trim();
 			//on récupère l'opération correspondante (si elle existe)
-			Map m = dico.get(s.toUpperCase());
-			if (m != null) {
-				Map.Entry<Signature, Operation> o = getCorrespondingOperation(m);
-				 Object obj = null;
-				// on compute si possible
-				if (o != null)
-					obj = o.getValue().compute(toArrayInRange(o.getKey().getNbArgs()));
-
-				if (obj != null) {
-					// et si la computation a été faite, on push le resultat
-					stack.push(obj);
-					Token[] t = histo.subList(histo.size() - o.getKey().getNbArgs(),
-							histo.size()).toArray(new Token[o.getKey().getNbArgs()]);
-					histo.add(new Token.OperationToken(t,o.getValue(),s));
-					return;
-				}
+			Optional<Map.Entry<Object,Token.OperationToken>> opeOpt = getOperationFromString(s);
+			if(opeOpt.isPresent()){
+				Map.Entry<Object,Token.OperationToken> var = opeOpt.get();
+				stack.push(var.getKey()); histo.add(var.getValue());
+				continue;
 			}
 			// dans le cas ou on le mot ne correspond a aucune opération connue
 			try {
 				// si le mot commence par '!', on stock une variable avec en nom le reste du mot (sans le '!')
 				if (s.charAt(0) == '!') {
-					String sub = s.substring(1, s.length());
+					String sub = s.substring(1);
 					stack.pop();
 					variables.put(sub, new Token.RecallToken(histo.get(histo.size() - 1)));
-					return;
+					continue;
 				}
 				// si le mot commence par '?', on empile le valeur de la variable stockée
 				if (s.charAt(0) == '?') {
-					String sub = s.substring(1, s.length());
+					String sub = s.substring(1);
 					stack.push(variables.get(sub).getValue());
-					return;
+					continue;
 				}
 				// si on execute la commande 'hist', obj prend la valeur de l'historique demandée
 				if (s.length() > 4 && s.substring(0, 4).equals("hist")) {
 					int i = Integer.valueOf(s.substring(s.indexOf("(") + 1, s.indexOf(")")));
-					// On créer une 'copie' de l'opérande (une opérande sans inputs)
+					// On créer un token de rappel pointant sur la case dans l'historique
 					Token recall = new Token.RecallToken(histo.get((i >= 0) ? i : histo.size() + i));
 					stack.push(recall.getValue());
 					histo.add(recall);
@@ -161,17 +172,39 @@ public final class Calculatrice {
 					histo.add(op);
 					// sinon, on tente de parser le mot lu
 				} else {
-					Object obj = TypeParser.parse(s);
-					if (obj != null){
-						stack.push(obj);
-						histo.add(new Token.OperandToken(obj));
+					Optional<Object> opt = TypeParser.parse(s);
+					if (opt.isPresent()){
+						stack.push(opt.get());
+						histo.add(new Token.OperandToken(opt.get()));
 					}
 				}
-				// enfin, si on a pu récuperer un objet, on le push dans la pile et dans l'historique (clone...?)
 			} catch (Exception e) {
 				System.out.println(e);
 			}
 		}
+	}
+
+	private Optional<Map.Entry<Object,Token.OperationToken>> getOperationFromString(String s){
+		Map m = dico.get(s.toUpperCase());
+		if (m != null) {
+			Optional<Map.Entry<Signature, Operation>> operation = getCorrespondingOperation(m,stack.toArray());
+			// on compute si possible
+			if (operation.isPresent()) {
+				Map.Entry<Signature, Operation> sigop = operation.get();
+				Object obj = sigop.getValue().compute(toArrayInRange(sigop.getKey().getNbArgs()));
+				// Si l'opération n'a pas retourné 'null'
+				if (obj != null) {
+					// On récupère les n inputs, et on créer un nouveau OperationToken avec ces derniers
+					// qu'on ajoute a l'historique
+					Token[] t = histo.subList(histo.size() - sigop.getKey().getNbArgs(),
+							histo.size()).toArray(new Token[sigop.getKey().getNbArgs()]);
+					// Puis on passe a l'input suivant
+					return Optional.of(Map.entry(obj,new Token.OperationToken(t,sigop.getValue(),s)));
+				}
+			}
+
+		}
+		return Optional.empty();
 	}
 
 	private void parse() throws InterruptedException {
@@ -193,6 +226,7 @@ public final class Calculatrice {
 
 	public static void main(String[] args) {
 		Calculatrice c = new Calculatrice();
+		c.start();
 	}
 
 	private final static class Signature{
@@ -209,11 +243,11 @@ public final class Calculatrice {
 	public final static class TypeParser{
 		private TypeParser(){}
 
-		public static Object parse(String s){
+		public static Optional<Object> parse(String s){
 			Object o;
-			if((o = parseInt(s)) != null) return o;
-			if((o = parseBool(s)) != null) return o;
-			if((o = parseFrac(s)) != null) return o;
+			if((o = parseInt(s)) != null) return Optional.of(o);
+			if((o = parseBool(s)) != null) return Optional.of(o);
+			if((o = parseFrac(s)) != null) return Optional.of(o);
 			throw new IllegalArgumentException("Type de l'argument '"+s+"' inconnue.");
 		}
 
