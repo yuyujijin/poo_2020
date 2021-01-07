@@ -11,29 +11,18 @@ public final class Calculatrice {
 	private Map <String, Object> variables = new HashMap<>();
 	private Map<String,Map <Signature, Operation>> dico = new HashMap<>();
 
-
+	
+	public static void main(String[] args) {
+		Calculatrice c = new Calculatrice();
+	}
+	
 	public Calculatrice(){
 		addOperations();
 		parse();
 	}
-
-	private static String withoutSpaces(String s){
-		if(s == null) return "";
-		return s.replaceAll("\\s+","");
-	}
-
-	private Map.Entry<Signature,Operation> getCorrespondingOperation(Map<Signature,Operation> m){
-		for(Map.Entry<Signature,Operation> s : m.entrySet()){
-			Signature sig = s.getKey();
-			if(sig.getNbArgs() > stack.size()) continue;
-			boolean valid = true;
-			for(int i = 0; i < sig.getNbArgs(); i++)
-				if(!sig.getTypeArgs().get(i).isInstance(stack.get(stack.size() - 1 - i))){ valid = false; break; }
-			if(valid) return s;
-		}
-		return null;
-	}
-
+	
+	//ajoute les operations, leurs version string,
+	//et les type acceptés au dictionnaire
 	private void addOperations(){
 		String[] operations = new String[]{"+", "-","*","/","AND","OR","NOT","^"};
 		for(String s : operations) dico.put(s, new HashMap<>());
@@ -65,12 +54,6 @@ public final class Calculatrice {
 				args -> Fraction.sum(new Fraction((Integer) args[0],1),(Fraction) args[1]));
 	}
 
-	private Object[] toArrayInRange(int n){
-		Object[] o = new Object[n];
-		for(int i = 0 ; i < n; i++) o[i] = stack.pop();
-		return o;
-	}
-
 	private void parse(){
 		while (!strVal.equals("=")) {
 			if (stack.size() > 0) System.out.println(stack.peek());
@@ -80,10 +63,10 @@ public final class Calculatrice {
 
 			//si la valeur est nulle
 			if (withoutSpaces(strVal).length() <= 0) continue;
-
+			
 			Stack<String> mots = new Stack<>();
 			mots.addAll(Arrays.asList(strVal.trim().split("[ \t]+")));
-
+			
 			//pour chaque mot dans la ligne que l'on vient de rentrer
 			for (String s : mots) {
 				s = s.trim();
@@ -137,9 +120,29 @@ public final class Calculatrice {
 		}
 	}
 
-	public static void main(String[] args) {
-		Calculatrice c = new Calculatrice();
+	private Object[] toArrayInRange(int n){
+		Object[] o = new Object[n];
+		for(int i = 0 ; i < n; i++) o[i] = stack.pop();
+		return o;
 	}
+	
+	private static String withoutSpaces(String s){
+		if(s == null) return "";
+		return s.replaceAll("\\s+","");
+	}
+
+	private Map.Entry<Signature,Operation> getCorrespondingOperation(Map<Signature,Operation> m){
+		for(Map.Entry<Signature,Operation> s : m.entrySet()){
+			Signature sig = s.getKey();
+			if(sig.getNbArgs() > stack.size()) continue;
+			boolean valid = true;
+			for(int i = 0; i < sig.getNbArgs(); i++)
+				if(!sig.getTypeArgs().get(i).isInstance(stack.get(stack.size() - 1 - i))){ valid = false; break; }
+			if(valid) return s;
+		}
+		return null;
+	}
+
 
 	private final static class Signature{
 		private List<Class> typeArgs;
