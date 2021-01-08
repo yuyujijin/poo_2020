@@ -34,5 +34,6 @@ public final class CalculatriceController extends Application {
     public void start(Stage primaryStage) throws Exception {
         calculatrice = new Calculatrice();
         CalculatriceView calculatorView = new CalculatriceView(this);
+        CalculatriceView calculatriceView2 = new CalculatriceView(this);
     }
 }

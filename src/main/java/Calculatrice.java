@@ -1,3 +1,5 @@
+import javafx.collections.ObservableMap;
+
 import java.util.*;
 import java.util.concurrent.Flow;
 
@@ -5,9 +7,10 @@ public final class Calculatrice {
 	// La pile
 	private Stack<Object> stack = new Stack<>();
 	// L'historique, chaque Token representant une cellule
-	private List<Token> histo = new Stack<> ();
+	private List<Token> histo = new ArrayList<>();
 	// Le stockage des variables, dans une Map, clé "nom" valeur "token de rappel"
-	private Map <String, Token.RecallToken> variables = new HashMap<>();
+	private Map<String, Token.RecallToken> variables = new HashMap<String, Token.RecallToken>();
+
 	// Le dictionnaire des opérations disponibles
 	private Map<String,Map <Signature, Operation>> dico = new HashMap<>();
 
@@ -242,7 +245,6 @@ public final class Calculatrice {
 	 */
 	public void addStringToStack(String phrase) throws IllegalArgumentException, IndexOutOfBoundsException, EmptyStackException{
 		if (withoutSpaces(phrase).length() <= 0) return;
-
 		Stack<String> mots = new Stack<>();
 		mots.addAll(Arrays.asList(phrase.trim().split("[ \t]+")));
 
