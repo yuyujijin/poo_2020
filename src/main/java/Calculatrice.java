@@ -323,7 +323,11 @@ public final class Calculatrice {
 			strVal = useVal.nextLine();
 
 			//si la valeur est nulle
-			addStringToStack(strVal);
+			try {
+				addStringToStack(strVal);
+			}catch(Exception e){
+				System.out.println(e);
+			}
 		}
 	}
 
