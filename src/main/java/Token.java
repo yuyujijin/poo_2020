@@ -1,40 +1,42 @@
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.Flow;
 import java.util.concurrent.SubmissionPublisher;
 import java.util.function.Consumer;
 
 public abstract class Token implements Flow.Publisher {
     private final SubmissionPublisher output;
+    private Object value;
 
     private Token(){
         this.output = new SubmissionPublisher();
     }
 
-    public abstract Object getValue();
+    public Object getValue(){ return this.value; }
+    protected void setValue(Object o){ this.value = o; }
 
     @Override
-    public final void subscribe(Flow.Subscriber subscriber){
+    public synchronized final void subscribe(Flow.Subscriber subscriber){
         output.subscribe(subscriber);
         output.submit(getValue());
     }
-    protected final Optional<Flow.Subscriber> unsubscribe(){
-        if(output.hasSubscribers()) {
-            Flow.Subscriber s = (Flow.Subscriber) output.getSubscribers().get(0);
+
+    public synchronized final void subscribe(List<Flow.Subscriber> subscribers){
+        subscribers.stream().forEach(subscriber -> subscribe(subscriber));
+    }
+    protected final Optional<List<Flow.Subscriber>> unsubscribe(){
+        if(output.hasSubscribers()){
+            List<Flow.Subscriber> l = output.getSubscribers();
             output.close();
-            return Optional.of(s);
+            return Optional.of(l);
         }
-        output.close();
         return Optional.empty();
     }
 
-    public abstract Optional<Flow.Subscriber> delete();
+
+    public abstract Optional<List<Flow.Subscriber>> delete();
 
     protected void submit(Object o){
         output.submit(o);
-    }
-
-    public final boolean isSubscribed(){
-        return output.hasSubscribers();
     }
 
     public final String valueClassToString(){ return getValue().getClass().getSimpleName(); }
@@ -44,23 +46,19 @@ public abstract class Token implements Flow.Publisher {
     }
 
     public static final class OperandToken extends Token{
-        private Object value;
 
         public OperandToken(Object o){
-            this.value = o;
+            setValue(o);
         }
 
-        public final Optional<Flow.Subscriber> delete(){
+        @Override
+        public Object getValue() {
+            return super.getValue();
+        }
+
+        public final Optional<List<Flow.Subscriber>> delete(){
             return super.unsubscribe();
         }
-
-        public void updateValue(Object o){
-            if(!o.getClass().isInstance(value)) throw new IllegalArgumentException();
-            this.value = o;
-            submit(o);
-        }
-
-        public Object getValue(){ return value; }
     }
 
     public static final class OperationToken extends Token{
@@ -80,10 +78,12 @@ public abstract class Token implements Flow.Publisher {
                 inputs[i] = new OperationToken.FanInSubscriber(message -> {
                     values[finalI] = message;});
             }
-            for(int i = 0; i < operandes.length; i++) operandes[i].subscribe(inputs[i]);
+            for(int i = 0; i < operandes.length; i++){
+                operandes[i].subscribe(inputs[i]);
+            }
         }
 
-        public final Optional<Flow.Subscriber> delete(){
+        public final Optional<List<Flow.Subscriber>> delete(){
             deleteSubs();
             return super.unsubscribe();
         }
@@ -93,7 +93,10 @@ public abstract class Token implements Flow.Publisher {
         }
 
         public Object getValue(){
-            return operation.compute(values);
+            // Dans le cas d'une demande de valeur alors que tout les inputs n'ont pas été envoyé (appel bloquant)
+            while (valuesNull());
+            if(super.getValue() == null) setValue(operation.compute(values));
+            return super.getValue();
         }
 
         public String toString(){
@@ -117,7 +120,7 @@ public abstract class Token implements Flow.Publisher {
 
             @Override
             public void onNext(T message) {
-                synchronized (OperationToken.this) {
+                synchronized (this) {
                     store.accept(message);
                     tryProcessNext();
                 }
@@ -142,28 +145,46 @@ public abstract class Token implements Flow.Publisher {
         private void tryProcessNext() {
             if (valuesNull())
                 return; // la source en avance s'arrête là et ne fait rien de particulier
+            // On force le recalcule
+            setValue(operation.compute(values));
             submit(getValue());
             for(int i = 0; i < inputs.length; i++) inputs[i].subscription.request(1);
         }
     }
 
     public static final class RecallToken extends Token implements Flow.Subscriber{
-        private Object value;
+        private String name;
         private Flow.Subscription subscription;
+        private Token subscriber;
 
-        public RecallToken(Token t){
-            t.subscribe(this);
-            value = t.getValue();
+        public RecallToken(Token t, String s){
+            subscriber = t;
+            subscriber.subscribe(this);
+            name = s;
+            setValue(t.getValue());
         }
 
-        public final Optional<Flow.Subscriber> delete(){
+        public final void cancelSubscription(){
+            subscription.cancel();
+        }
+
+        public final String toString(){
+            return "("+name+") "+super.toString();
+        }
+
+        public final Optional<List<Flow.Subscriber>> delete(){
             subscription.cancel();
             return super.unsubscribe();
         }
 
+        public void updateValue(Object o){
+            setValue(o);
+            submit(o);
+        }
+
         @Override
         public Object getValue() {
-            return value;
+            return super.getValue();
         }
 
         @Override
@@ -175,9 +196,9 @@ public abstract class Token implements Flow.Publisher {
         @Override
         public void onNext(Object item) {
             synchronized (this) {
-                this.value = item;
+                setValue(item);
                 subscription.request(1);
-                submit(this.value);
+                submit(item);
             }
         }
 
