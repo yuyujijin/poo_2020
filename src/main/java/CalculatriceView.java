@@ -72,8 +72,8 @@ public final class CalculatriceView extends Stage{
                     // On tente d'ajouter le contenu du text dans la pile
                     try {
                         controller.addStringToStack(textInput.getText());
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
+                    } catch (Exception e) {
+                        alert(e.toString());
                     }
                     // On vide l'entrée
                     textInput.setText("");
@@ -108,6 +108,14 @@ public final class CalculatriceView extends Stage{
         printStack(stackDisplay,stackScroll,controller.getStackToArray());
         printHistorique(controller.getHistToArray());
         printVar(controller.getVarToArray());
+    }
+
+    private void alert(String s) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Exception durant l'execution");
+        alert.setHeaderText(null);
+        alert.setContentText(s);
+        alert.showAndWait();
     }
 
     private void putMapColors(){

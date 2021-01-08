@@ -42,7 +42,6 @@ public final class Fraction{
     }
     private Object reduce(){
         int pgcd = PGCD(numerateur,denominateur);
-        if(denominateur/pgcd == 1) return numerateur/pgcd;
         return new Fraction(numerateur/pgcd,denominateur/pgcd);
     }
     private int PGCD(int n1, int n2) {
@@ -53,6 +52,7 @@ public final class Fraction{
     }
 
     public String toString(){
+        if(denominateur == 1) return String.valueOf(numerateur);
         return numerateur+"/"+denominateur;
     }
 }

@@ -26,7 +26,7 @@ public final class CalculatriceController extends Application {
         calculatrice.updateVar(s,v);
     }
 
-    public void addStringToStack(String s) throws InterruptedException {
+    public void addStringToStack(String s) throws IllegalArgumentException, IndexOutOfBoundsException {
         calculatrice.addStringToStack(s);
     }
 

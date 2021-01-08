@@ -57,7 +57,7 @@ public final class Calculatrice {
 			}
 			if(valid) return Optional.of(s);
 		}
-		return Optional.empty();
+		throw new IllegalArgumentException("Opération impossible sur les éléments présent dans la pile");
 	}
 
 	/**
@@ -77,10 +77,11 @@ public final class Calculatrice {
 				if (obj != null) {
 					// On récupère les n inputs, et on créer un nouveau OperationToken avec ces derniers
 					// qu'on ajoute a l'historique
-					Token[] t = histo.subList(histo.size() - sigop.getKey().getNbArgs(),
-							histo.size()).toArray(new Token[sigop.getKey().getNbArgs()]);
+					List<Token> t = new ArrayList<>(histo.subList(histo.size() - sigop.getKey().getNbArgs(),
+							histo.size()));
+					Collections.reverse(t);
 					// Puis on passe a l'input suivant
-					return Optional.of(Map.entry(obj,new Token.OperationToken(t,sigop.getValue(),s)));
+					return Optional.of(Map.entry(obj,new Token.OperationToken(t.toArray(new Token[sigop.getKey().getNbArgs()]),sigop.getValue(),s)));
 				}
 			}
 
@@ -92,7 +93,7 @@ public final class Calculatrice {
 	 * ajoute toutes les opérations disponible à la map d'opérations
 	 */
 	private void addOperations(){
-		String[] operations = new String[]{"+", "-","*","/","AND","OR","NOT","^"};
+		String[] operations = new String[]{"+", "-","*","/","AND","OR","NOT","UNION","INTER","CONTAINS","EQUALS"};
 		for(String s : operations) dico.put(s, new HashMap<>());
 		// opérations usuelles sur les entiers
 		dico.get("+").put(new Signature(List.of(Integer.class,Integer.class)),
@@ -122,11 +123,36 @@ public final class Calculatrice {
 		dico.get("*").put(new Signature(List.of(Fraction.class,Fraction.class)),
 				args -> Fraction.multiplicate((Fraction) args[0],(Fraction) args[1]));
 
+		// opérations usuelles sur les ensembles
+		dico.get("UNION").put(new Signature(List.of(Ensemble.class,Ensemble.class)),
+				args -> Ensemble.union((Ensemble) args[0],(Ensemble) args[1]));
+		dico.get("INTER").put(new Signature(List.of(Ensemble.class,Ensemble.class)),
+				args -> Ensemble.inter((Ensemble) args[0],(Ensemble) args[1]));
+		dico.get("CONTAINS").put(new Signature(List.of(Ensemble.class,Object.class)),
+				args -> Ensemble.contains((Ensemble) args[0],args[1]));
+		dico.get("EQUALS").put(new Signature(List.of(Ensemble.class,Ensemble.class)),
+				args -> Ensemble.equals((Ensemble) args[0],(Ensemble) args[1]));
+
 		// addition entre des entiers et des fractions
 		dico.get("+").put(new Signature(List.of(Fraction.class,Integer.class)),
 				args -> Fraction.sum((Fraction) args[0],(Integer) args[1]));
 		dico.get("+").put(new Signature(List.of(Integer.class,Fraction.class)),
 				args -> Fraction.sum((Integer) args[0],(Fraction) args[1]));
+		// soustraction entre des entiers et des fractions
+		dico.get("-").put(new Signature(List.of(Fraction.class,Integer.class)),
+				args -> Fraction.substract((Fraction) args[0],(Integer) args[1]));
+		dico.get("-").put(new Signature(List.of(Integer.class,Fraction.class)),
+				args -> Fraction.substract((Integer) args[0],(Fraction) args[1]));
+		// soustraction entre des entiers et des fractions
+		dico.get("/").put(new Signature(List.of(Fraction.class,Integer.class)),
+				args -> Fraction.divide((Fraction) args[0],(Integer) args[1]));
+		dico.get("/").put(new Signature(List.of(Integer.class,Fraction.class)),
+				args -> Fraction.divide((Integer) args[0],(Fraction) args[1]));
+		// soustraction entre des entiers et des fractions
+		dico.get("*").put(new Signature(List.of(Fraction.class,Integer.class)),
+				args -> Fraction.multiplicate((Fraction) args[0],(Integer) args[1]));
+		dico.get("*").put(new Signature(List.of(Integer.class,Fraction.class)),
+				args -> Fraction.multiplicate((Integer) args[0],(Fraction) args[1]));
 	}
 
 	/**
@@ -136,9 +162,9 @@ public final class Calculatrice {
 	 * @param i l'index de la valeur d'historique
 	 * @param s le String à parser pour changer la valeur
 	 */
-	public void updateValue(int i, String s){
+	public void updateValue(int i, String s) throws IndexOutOfBoundsException, IllegalArgumentException{
 		if(s == null || s.length() == 0)
-			throw new IndexOutOfBoundsException();
+			throw new IndexOutOfBoundsException("Index "+i+" pour un historique de taille "+s.length());
 
 		Map m = dico.get(s.toUpperCase());
 		if (m != null) {
@@ -151,10 +177,11 @@ public final class Calculatrice {
 				// qu'on ajoute a l'historique
 				// On récupère l'ancien output (qu'on a deconnecté de la case actuel)
 				Optional<List<Flow.Subscriber>> sub = histo.get(i).delete();
-				Token[] t = new ArrayList<Token>(histo).subList(i - sigop.getKey().getNbArgs(),
-						i).toArray(new Token[sigop.getKey().getNbArgs()]);
+				List<Token> t = new ArrayList<Token>(histo.subList(i - sigop.getKey().getNbArgs(),
+						i));
+				Collections.reverse(t);
 				// On remplace la case par la nouvelle
-				histo.set(i,new Token.OperationToken(t,sigop.getValue(),s));
+				histo.set(i,new Token.OperationToken(t.toArray(new Token[sigop.getKey().getNbArgs()]),sigop.getValue(),s));
 				// Et si il y avait un output, on rebranche les 2 :)
 				if(sub.isPresent()) histo.get(i).subscribe(sub.get());
 				return;
@@ -203,7 +230,7 @@ public final class Calculatrice {
 	 * @return un tableau d'objet contenant les n 'sommets' de la pile
 	 */
 	private Object[] toArrayInRange(int n){
-		if(n > stack.size()) throw new IndexOutOfBoundsException();
+		if(n > stack.size()) throw new IndexOutOfBoundsException("Taille "+n+" pour un historique de taille "+stack.size());
 		Object[] o = new Object[n];
 		for(int i = 0 ; i < n; i++) o[i] = stack.pop();
 		return o;
@@ -213,7 +240,7 @@ public final class Calculatrice {
 	 * ajoute un String donné a la pile
 	 * @param phrase un string (peut être une phrase de mot séparés par un espace)
 	 */
-	public void addStringToStack(String phrase){
+	public void addStringToStack(String phrase) throws IllegalArgumentException, IndexOutOfBoundsException, EmptyStackException{
 		if (withoutSpaces(phrase).length() <= 0) return;
 
 		Stack<String> mots = new Stack<>();
@@ -230,9 +257,10 @@ public final class Calculatrice {
 				continue;
 			}
 			// dans le cas ou on le mot ne correspond a aucune opération connue
-			try {
 				// si le mot commence par '!', on stock une variable avec en nom le reste du mot (sans le '!')
 				if (s.charAt(0) == '!') {
+					if(stack.size() <= 0)
+						throw new EmptyStackException();
 					String sub = s.substring(1);
 					if(variables.get(sub) != null){
 						if(stack.peek().getClass() == variables.get(sub).getValue().getClass())
@@ -246,8 +274,9 @@ public final class Calculatrice {
 				// si le mot commence par '?', on empile le valeur de la variable stockée
 				if (s.charAt(0) == '?') {
 					String sub = s.substring(1);
-					Token recall = new Token.RecallToken(variables.get(sub),sub);
-					if(recall == null) return;
+					Token x = variables.get(sub);
+					if(x == null) throw new NullPointerException("'"+sub+"' non présent dans la liste des variables");
+					Token recall = new Token.RecallToken(x,sub);
 					stack.push(recall.getValue());
 					histo.add(recall);
 					continue;
@@ -274,11 +303,8 @@ public final class Calculatrice {
 						histo.add(new Token.OperandToken(opt.get()));
 					}
 				}
-			} catch (Exception e) {
-				System.out.println(e);
 			}
 		}
-	}
 
 	/**
 	 * lit dans l'entrée standard grâce a un scanner et parser chaque entrée en utilisant addStringToStack()
@@ -326,6 +352,7 @@ public final class Calculatrice {
 			if((o = parseInt(s)) != null) return Optional.of(o);
 			if((o = parseBool(s)) != null) return Optional.of(o);
 			if((o = parseFrac(s)) != null) return Optional.of(o);
+			if((o = parseEnsemble(s)) != null) return Optional.of(o);
 			throw new IllegalArgumentException("Type de l'argument '"+s+"' inconnue.");
 		}
 
@@ -352,6 +379,25 @@ public final class Calculatrice {
 					return new Fraction(n,d);
 				}catch(Exception e){
 				}
+			return null;
+		}
+
+		private static Ensemble parseEnsemble(String s){
+			if(s.charAt(0) == '{' && s.charAt(s.length() - 1) == '}'){
+				try{
+					List<String> mots = new ArrayList<>();
+					mots.addAll(Arrays.asList(s.substring(1,s.length() - 1).trim().split(";")));
+					List<Object> elems = new ArrayList<>();
+					for(String x : mots){
+						Optional<Object> o = parse(x);
+						if(!o.isPresent()) return null;
+						elems.add(o.get());
+					}
+					return new Ensemble(elems);
+				}catch(Exception e){
+
+				}
+			}
 			return null;
 		}
 	}
