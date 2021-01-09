@@ -4,8 +4,8 @@
 
 #### Membres :
 
-* `Elsa SANTOS DUARTE`
-* `Eugène VALTY`
+* `Elsa SANTOS DUARTE 7168550`
+* `Eugène VALTY 71805512`
 
 #### Ennoncé du projet :
 
