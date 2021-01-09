@@ -1,8 +1,12 @@
+import javafx.event.Event;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -14,6 +18,7 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 public final class CalculatriceView extends Stage{
     // Le controlleur
@@ -26,6 +31,7 @@ public final class CalculatriceView extends Stage{
     private VBox historiqueDisplay;
     private ScrollPane varScroll;
     private VBox varDisplay;
+    private final LineChart<Number,Number> lineChart = new LineChart<Number,Number>(new NumberAxis(), new NumberAxis());
 
     // Les couleurs pour les cases du tableaux
     private final static Color[] colors = new Color[]{ Color.web("dfdfdf"), Color.web("f0f0f0") };
@@ -49,11 +55,13 @@ public final class CalculatriceView extends Stage{
 
         varScroll = new ScrollPane();
         varScroll.setFitToWidth(true);
+        varScroll.setPrefHeight(HEIGHT * 0.50);
 
         // Puis on créer les 3 VBox pour afficher verticalement les valeurs dedans
         VBox stackDisplay = createStackDisplay(HEIGHT *  .95);
         historiqueDisplay = createStackDisplay(HEIGHT);
         varDisplay = createStackDisplay(HEIGHT);
+
 
         stackScroll.setContent(stackDisplay);
         histScroll.setContent(historiqueDisplay);
@@ -91,15 +99,21 @@ public final class CalculatriceView extends Stage{
         VBox midPane = new VBox();
         midPane.getChildren().addAll(stackScroll, textInput);
 
+        lineChart.setPrefSize(WIDTH * 0.3,HEIGHT * 0.5);
+
+        VBox leftPane = new VBox();
+        leftPane.getChildren().addAll(varScroll,lineChart);
+
         // On attribut les tailles en largeur
         midPane.setPrefWidth(WIDTH * .32);
         histScroll.setPrefWidth(WIDTH * .36);
         varScroll.setPrefWidth(WIDTH * .32);
 
+
         // Puis on créer la box central
         setTitle("Calculatrice");
         HBox root = new HBox();
-        root.getChildren().addAll(varScroll,midPane,histScroll);
+        root.getChildren().addAll(leftPane,midPane,histScroll);
 
         setScene(new Scene(root, WIDTH, HEIGHT));
         show();
@@ -108,6 +122,20 @@ public final class CalculatriceView extends Stage{
         printStack(stackDisplay,stackScroll,controller.getStackToArray());
         printHistorique(controller.getHistToArray());
         printVar(controller.getVarToArray());
+    }
+
+    private void updateGraph(Function<Integer,Integer> f, String s){
+        lineChart.getData().clear();
+        int range = 20;
+        XYChart.Series<Number,Number> chart = new XYChart.Series<>();
+        for(Integer x = -range; x < range; x += 1){
+            try{
+                chart.getData().add(new XYChart.Data<>(x,f.apply(x)));
+            }catch(ArithmeticException e){
+            }
+        }
+        lineChart.setTitle(s);
+        lineChart.getData().add(chart);
     }
 
     private void alert(String s) {
@@ -165,6 +193,8 @@ public final class CalculatriceView extends Stage{
             colorsIndex = (colorsIndex + 1) % 2;
         }
 
+        // A chaque réaffichage on tente d'update le graph avec le sommet de l'historique
+        if(tokens.length > 0) updateGraphFromObj(tokens[i - 1]);
         // Pour scroller tout en bas
         histScroll.getParent().layout();
         histScroll.setVvalue(1.0d);
@@ -270,6 +300,34 @@ public final class CalculatriceView extends Stage{
         for(Node n : bPane.getChildren()) BorderPane.setMargin(n,new Insets(10));
 
         stackItem.getChildren().addAll(bPane);
+        stackItem.setOnMouseClicked(event -> {
+            updateGraphFromObj(op);
+        });
         return stackItem;
+    }
+
+    private void updateGraphFromObj(Object op){
+        if(op instanceof Token.OperationToken && ((Token.OperationToken) op).getValue() instanceof Integer){
+            // On récupère les 2 derniers éléments avant 'op' dans l'historique
+            // et si l'un (et seulement un) des deux est un token d'opérande (une valeur fixée), alors on graphe
+            Token[] hist = controller.getHistToArray();
+            for(int i = 0; i < hist.length; i++){
+                if(hist[i] == op){
+                    Token t2 = hist[i - 1];
+                    Token t1 = hist[i - 2];
+                    // Si t1 est une variable libre, et t2 une variable liée
+                    if(!(t1 instanceof Token.OperandToken) && t2 instanceof Token.OperandToken){
+                        updateGraph(x -> (Integer) ((Token.OperationToken) op).getOperation()
+                                        .compute(new Integer[]{(Integer) t2.getValue(),x}),
+                                "x "+((Token.OperationToken) op).getOperationName()+" "+t2.getValue());
+                        // l'inverse
+                    }else if(!(t2 instanceof Token.OperandToken) && t1 instanceof Token.OperandToken){
+                        updateGraph(x -> (Integer) ((Token.OperationToken) op).getOperation()
+                                        .compute(new Integer[]{x, (Integer) t1.getValue()}),
+                                t1.getValue()+" "+((Token.OperationToken) op).getOperationName()+" x");
+                    }
+                }
+            }
+        }
     }
 }

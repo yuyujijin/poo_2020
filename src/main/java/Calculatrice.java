@@ -100,13 +100,13 @@ public final class Calculatrice {
 		for(String s : operations) dico.put(s, new HashMap<>());
 		// opérations usuelles sur les entiers
 		dico.get("+").put(new Signature(List.of(Integer.class,Integer.class)),
-				args -> (Integer) args[0] + (Integer) args[1]);
+				args -> (Integer) args[1] + (Integer) args[0]);
 		dico.get("-").put(new Signature(List.of(Integer.class,Integer.class)),
-				args -> (Integer) args[0] - (Integer) args[1]);
+				args -> (Integer) args[1] - (Integer) args[0]);
 		dico.get("*").put(new Signature(List.of(Integer.class,Integer.class)),
-				args -> (Integer) args[0] * (Integer) args[1]);
+				args -> (Integer) args[1] * (Integer) args[0]);
 		dico.get("/").put(new Signature(List.of(Integer.class,Integer.class)),
-				args -> (Integer) args[0] / (Integer) args[1]);
+				args -> (Integer) args[1] / (Integer) args[0]);
 
 		// opérations 'et' 'ou' 'non' sur les booléens
 		dico.get("AND").put(new Signature(List.of(Boolean.class,Boolean.class)),
@@ -118,13 +118,13 @@ public final class Calculatrice {
 
 		// opérations usuelles sur les fractions
 		dico.get("+").put(new Signature(List.of(Fraction.class,Fraction.class)),
-				args -> Fraction.sum((Fraction) args[0],(Fraction) args[1]));
+				args -> Fraction.sum((Fraction) args[1],(Fraction) args[0]));
 		dico.get("-").put(new Signature(List.of(Fraction.class,Fraction.class)),
-				args -> Fraction.substract((Fraction) args[0],(Fraction) args[1]));
+				args -> Fraction.substract((Fraction) args[1],(Fraction) args[0]));
 		dico.get("/").put(new Signature(List.of(Fraction.class,Fraction.class)),
-				args -> Fraction.divide((Fraction) args[0],(Fraction) args[1]));
+				args -> Fraction.divide((Fraction) args[1],(Fraction) args[0]));
 		dico.get("*").put(new Signature(List.of(Fraction.class,Fraction.class)),
-				args -> Fraction.multiplicate((Fraction) args[0],(Fraction) args[1]));
+				args -> Fraction.multiplicate((Fraction) args[1],(Fraction) args[0]));
 
 		// opérations usuelles sur les ensembles
 		dico.get("UNION").put(new Signature(List.of(Ensemble.class,Ensemble.class)),
@@ -132,30 +132,30 @@ public final class Calculatrice {
 		dico.get("INTER").put(new Signature(List.of(Ensemble.class,Ensemble.class)),
 				args -> Ensemble.inter((Ensemble) args[0],(Ensemble) args[1]));
 		dico.get("CONTAINS").put(new Signature(List.of(Ensemble.class,Object.class)),
-				args -> Ensemble.contains((Ensemble) args[0],args[1]));
+				args -> Ensemble.contains((Ensemble) args[1],args[0]));
 		dico.get("EQUALS").put(new Signature(List.of(Ensemble.class,Ensemble.class)),
-				args -> Ensemble.equals((Ensemble) args[0],(Ensemble) args[1]));
+				args -> Ensemble.equals((Ensemble) args[1],(Ensemble) args[0]));
 
 		// addition entre des entiers et des fractions
 		dico.get("+").put(new Signature(List.of(Fraction.class,Integer.class)),
-				args -> Fraction.sum((Fraction) args[0],(Integer) args[1]));
+				args -> Fraction.sum((Fraction) args[1],(Integer) args[0]));
 		dico.get("+").put(new Signature(List.of(Integer.class,Fraction.class)),
-				args -> Fraction.sum((Integer) args[0],(Fraction) args[1]));
+				args -> Fraction.sum((Integer) args[1],(Fraction) args[0]));
 		// soustraction entre des entiers et des fractions
 		dico.get("-").put(new Signature(List.of(Fraction.class,Integer.class)),
-				args -> Fraction.substract((Fraction) args[0],(Integer) args[1]));
+				args -> Fraction.substract((Fraction) args[1],(Integer) args[0]));
 		dico.get("-").put(new Signature(List.of(Integer.class,Fraction.class)),
-				args -> Fraction.substract((Integer) args[0],(Fraction) args[1]));
+				args -> Fraction.substract((Integer) args[1],(Fraction) args[0]));
 		// soustraction entre des entiers et des fractions
 		dico.get("/").put(new Signature(List.of(Fraction.class,Integer.class)),
-				args -> Fraction.divide((Fraction) args[0],(Integer) args[1]));
+				args -> Fraction.divide((Fraction) args[1],(Integer) args[0]));
 		dico.get("/").put(new Signature(List.of(Integer.class,Fraction.class)),
-				args -> Fraction.divide((Integer) args[0],(Fraction) args[1]));
+				args -> Fraction.divide((Integer) args[1],(Fraction) args[0]));
 		// soustraction entre des entiers et des fractions
 		dico.get("*").put(new Signature(List.of(Fraction.class,Integer.class)),
-				args -> Fraction.multiplicate((Fraction) args[0],(Integer) args[1]));
+				args -> Fraction.multiplicate((Fraction) args[1],(Integer) args[0]));
 		dico.get("*").put(new Signature(List.of(Integer.class,Fraction.class)),
-				args -> Fraction.multiplicate((Integer) args[0],(Fraction) args[1]));
+				args -> Fraction.multiplicate((Integer) args[1],(Fraction) args[0]));
 	}
 
 	/**
@@ -243,7 +243,7 @@ public final class Calculatrice {
 	 * ajoute un String donné a la pile
 	 * @param phrase un string (peut être une phrase de mot séparés par un espace)
 	 */
-	public void addStringToStack(String phrase) throws IllegalArgumentException, IndexOutOfBoundsException, EmptyStackException{
+	public synchronized void addStringToStack(String phrase) throws IllegalArgumentException, IndexOutOfBoundsException, EmptyStackException{
 		if (withoutSpaces(phrase).length() <= 0) return;
 		Stack<String> mots = new Stack<>();
 		mots.addAll(Arrays.asList(phrase.trim().split("[ \t]+")));

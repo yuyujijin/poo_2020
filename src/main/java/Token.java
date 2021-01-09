@@ -67,7 +67,6 @@ public abstract class Token implements Flow.Publisher {
         public final OperationToken.FanInSubscriber<Object>[] inputs;
         private final String operationName;
 
-
         public OperationToken(Token[] operandes, Operation operation, String operationName) {
             this.operation = operation;
             this.operationName = operationName;
@@ -76,11 +75,19 @@ public abstract class Token implements Flow.Publisher {
             for(int i = 0; i < inputs.length; i++){
                 int finalI = i;
                 inputs[i] = new OperationToken.FanInSubscriber(message -> {
-                    values[finalI] = message;});
+                    values[finalI] = message; });
             }
             for(int i = 0; i < operandes.length; i++){
                 operandes[i].subscribe(inputs[i]);
             }
+        }
+
+        public Operation getOperation(){
+            return operation;
+        }
+
+        public String getOperationName(){
+            return operationName;
         }
 
         public final Optional<List<Flow.Subscriber>> delete(){
