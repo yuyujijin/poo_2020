@@ -96,7 +96,7 @@ public final class Calculatrice {
 	 * ajoute toutes les opérations disponible à la map d'opérations
 	 */
 	private void addOperations(){
-		String[] operations = new String[]{"+", "-","*","/","AND","OR","NOT","UNION","INTER","CONTAINS","EQUALS","POW"};
+		String[] operations = new String[]{"+", "-","*","/","AND","OR","NOT","UNION","INTER","POW"};
 		for(String s : operations) dico.put(s, new HashMap<>());
 		// opérations usuelles sur les entiers
 		dico.get("+").put(new Signature(List.of(Integer.class,Integer.class)),
@@ -138,24 +138,24 @@ public final class Calculatrice {
 
 		// addition entre des entiers et des fractions
 		dico.get("+").put(new Signature(List.of(Fraction.class,Integer.class)),
-				args -> Fraction.sum((Fraction) args[1],(Integer) args[0]));
+				args -> Fraction.sum((Fraction) args[0],(Integer) args[1]));
 		dico.get("+").put(new Signature(List.of(Integer.class,Fraction.class)),
-				args -> Fraction.sum((Integer) args[1],(Fraction) args[0]));
+				args -> Fraction.sum((Integer) args[0],(Fraction) args[1]));
 		// soustraction entre des entiers et des fractions
 		dico.get("-").put(new Signature(List.of(Fraction.class,Integer.class)),
-				args -> Fraction.substract((Fraction) args[1],(Integer) args[0]));
+				args -> Fraction.substract((Fraction) args[0],(Integer) args[1]));
 		dico.get("-").put(new Signature(List.of(Integer.class,Fraction.class)),
-				args -> Fraction.substract((Integer) args[1],(Fraction) args[0]));
+				args -> Fraction.substract((Integer) args[0],(Fraction) args[1]));
 		// soustraction entre des entiers et des fractions
 		dico.get("/").put(new Signature(List.of(Fraction.class,Integer.class)),
-				args -> Fraction.divide((Fraction) args[1],(Integer) args[0]));
+				args -> Fraction.divide((Fraction) args[0],(Integer) args[1]));
 		dico.get("/").put(new Signature(List.of(Integer.class,Fraction.class)),
-				args -> Fraction.divide((Integer) args[1],(Fraction) args[0]));
+				args -> Fraction.divide((Integer) args[0],(Fraction) args[1]));
 		// soustraction entre des entiers et des fractions
 		dico.get("*").put(new Signature(List.of(Fraction.class,Integer.class)),
-				args -> Fraction.multiplicate((Fraction) args[1],(Integer) args[0]));
+				args -> Fraction.multiplicate((Fraction) args[0],(Integer) args[1]));
 		dico.get("*").put(new Signature(List.of(Integer.class,Fraction.class)),
-				args -> Fraction.multiplicate((Integer) args[1],(Fraction) args[0]));
+				args -> Fraction.multiplicate((Integer) args[0],(Fraction) args[1]));
 	}
 
 	/**

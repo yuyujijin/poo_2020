@@ -34,11 +34,9 @@ public final class Fraction{
     public static Object divide(Fraction f1, Fraction f2){
         return new Fraction(f1.numerateur * f2.denominateur, f1.denominateur * f2.numerateur).reduce();
     }
-    public static Object divide(Fraction f1, Integer i){
-        return divide(f1,new Fraction(i,1));
-    }
+    public static Object divide(Fraction f1, Integer i){ return divide(new Fraction(i,1),f1); }
     public static Object divide(Integer i, Fraction f2){
-        return divide(new Fraction(i,1),f2);
+        return divide(f2,new Fraction(i,1));
     }
     private Object reduce(){
         int pgcd = PGCD(numerateur,denominateur);
