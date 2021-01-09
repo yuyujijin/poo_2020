@@ -59,7 +59,7 @@ et d'empiler cette valeur, sinon renvoie une erreur.
 Les opérations sont ajoutés a la création de la `Calculatrice`, pour chaque types
 connu.
 
-# Extension 3 :
+### Extension 3 :
 
 Lors du parsing, on vérifie aussi si la valeur du string n'est pas :
 * "hist(x)", auquel cas on créer un nouveau `RecallToken` pointant vers la case x de l'historique, et on l'ajoute
@@ -69,7 +69,7 @@ d'`OperandToken`)
 * "!x", dépilant le sommet de la pile et l'ajoutant (ou modifiant la valeur) dans le Set, sous format de `RecallToken`
 * "?x" empile la valeur stocké par x dans le Set si il existe, et ajoute un `RecallToken` de x dans l'historique.
 
-# Extension 5
+### Extension 5
 
 L'ajout de la vue fait partie de cette extension.
 Seul les variables de l'historique et du tableau des variables sont modifiables.
@@ -86,7 +86,7 @@ Lors du stockage d'une variable `x`, via `!x`, elle pointe maintenant vers la ca
 étant en sommet d'historique a ce moment.
 Si on modifie cette variable, elle est donc déconnectée de son input.
 
-# Extension 7
+### Extension 7
 
 Le graph permet d'afficher les opération sur les `Integer` contenant une variable
 libre et une variable liée (liée = `OperandToken`). Elle graphe donc x <Opération>
