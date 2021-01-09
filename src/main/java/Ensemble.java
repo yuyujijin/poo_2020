@@ -27,6 +27,14 @@ public final class Ensemble<T>{
         return e;
     }
 
+    public static final Ensemble product(Ensemble e1, Ensemble e2){
+        Ensemble e = new Ensemble();
+        for(Object elem : e1.elements){
+            e2.elements.stream().forEach(x -> e.add(new Ensemble(List.of(elem,x))));
+        }
+        return e;
+    }
+
     public static final <T> boolean contains(Ensemble e, T elem){
         return e.elements.contains(elem);
     }

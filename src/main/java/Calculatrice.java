@@ -96,7 +96,7 @@ public final class Calculatrice {
 	 * ajoute toutes les opérations disponible à la map d'opérations
 	 */
 	private void addOperations(){
-		String[] operations = new String[]{"+", "-","*","/","AND","OR","NOT","UNION","INTER","CONTAINS","EQUALS"};
+		String[] operations = new String[]{"+", "-","*","/","AND","OR","NOT","UNION","INTER","CONTAINS","EQUALS","POW"};
 		for(String s : operations) dico.put(s, new HashMap<>());
 		// opérations usuelles sur les entiers
 		dico.get("+").put(new Signature(List.of(Integer.class,Integer.class)),
@@ -107,6 +107,8 @@ public final class Calculatrice {
 				args -> (Integer) args[1] * (Integer) args[0]);
 		dico.get("/").put(new Signature(List.of(Integer.class,Integer.class)),
 				args -> (Integer) args[1] / (Integer) args[0]);
+		dico.get("POW").put(new Signature(List.of(Integer.class,Integer.class)),
+				args -> ((Double) Math.pow((Integer) args[1], (Integer) args[0])).intValue());
 
 		// opérations 'et' 'ou' 'non' sur les booléens
 		dico.get("AND").put(new Signature(List.of(Boolean.class,Boolean.class)),
@@ -131,10 +133,8 @@ public final class Calculatrice {
 				args -> Ensemble.union((Ensemble) args[0],(Ensemble) args[1]));
 		dico.get("INTER").put(new Signature(List.of(Ensemble.class,Ensemble.class)),
 				args -> Ensemble.inter((Ensemble) args[0],(Ensemble) args[1]));
-		dico.get("CONTAINS").put(new Signature(List.of(Ensemble.class,Object.class)),
-				args -> Ensemble.contains((Ensemble) args[1],args[0]));
-		dico.get("EQUALS").put(new Signature(List.of(Ensemble.class,Ensemble.class)),
-				args -> Ensemble.equals((Ensemble) args[1],(Ensemble) args[0]));
+		dico.get("*").put(new Signature(List.of(Ensemble.class,Object.class)),
+				args -> Ensemble.product((Ensemble) args[1],(Ensemble) args[0]));
 
 		// addition entre des entiers et des fractions
 		dico.get("+").put(new Signature(List.of(Fraction.class,Integer.class)),
@@ -180,8 +180,7 @@ public final class Calculatrice {
 				// qu'on ajoute a l'historique
 				// On récupère l'ancien output (qu'on a deconnecté de la case actuel)
 				Optional<List<Flow.Subscriber>> sub = histo.get(i).delete();
-				List<Token> t = new ArrayList<Token>(histo.subList(i - sigop.getKey().getNbArgs(),
-						i));
+				List<Token> t = new ArrayList<Token>(histo.subList(i - sigop.getKey().getNbArgs(), i));
 				Collections.reverse(t);
 				// On remplace la case par la nouvelle
 				histo.set(i,new Token.OperationToken(t.toArray(new Token[sigop.getKey().getNbArgs()]),sigop.getValue(),s));

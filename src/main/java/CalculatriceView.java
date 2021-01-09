@@ -8,6 +8,8 @@ import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
@@ -16,8 +18,11 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
+
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 public final class CalculatriceView extends Stage{
@@ -39,7 +44,7 @@ public final class CalculatriceView extends Stage{
 
     public CalculatriceView(CalculatriceController c){
         // On definit la taille, et on créer un nouveau modèle
-        WIDTH = 850; HEIGHT = 700;
+        WIDTH = 900; HEIGHT = 700;
         controller = c;
 
         // On ajoute les couleurs
@@ -124,6 +129,7 @@ public final class CalculatriceView extends Stage{
         printVar(controller.getVarToArray());
     }
 
+    // Met a jour le graph
     private void updateGraph(Function<Integer,Integer> f, String s){
         lineChart.getData().clear();
         int range = 20;
@@ -138,6 +144,7 @@ public final class CalculatriceView extends Stage{
         lineChart.getData().add(chart);
     }
 
+    // Permet d'afficher une alerte (utilisé pour les exception)
     private void alert(String s) {
         Alert alert = new Alert(Alert.AlertType.WARNING);
         alert.setTitle("Exception durant l'execution");
@@ -146,12 +153,15 @@ public final class CalculatriceView extends Stage{
         alert.showAndWait();
     }
 
+    // On y ajoute les différentes couleurs pour les différents types
     private void putMapColors(){
         classColors.put(Integer.class,Color.web("8ea0ab"));
         classColors.put(Boolean.class,Color.web("d17979"));
         classColors.put(Fraction.class,Color.web("7bb165"));
+        classColors.put(Ensemble.class,Color.web("6fb0bb"));
     }
 
+    // Permet de créer les labels en haut des differentes parties ("VARIABLES","PILE","HISTORIQUE")
     private StackPane createStackLabel(String s, double w, double h, Color c){
         StackPane pane = new StackPane();
         pane.setPrefSize(w,h);
@@ -184,7 +194,7 @@ public final class CalculatriceView extends Stage{
     private void printHistorique(Token[] tokens){
         int colorsIndex = 0;
         int i = 0;
-        // D'abord on clear la pile
+        // D'abord on clear l'historique'
         historiqueDisplay.getChildren().clear();
         historiqueDisplay.getChildren().add(createStackLabel("HISTORIQUE",historiqueDisplay.getWidth(),30, Color.web("bf7f7f")));
 
@@ -202,7 +212,7 @@ public final class CalculatriceView extends Stage{
 
     private void printVar(Map.Entry<String,Token.RecallToken>[] tokens){
         int colorsIndex = 0;
-        // D'abord on clear la pile
+        // D'abord on clear les vars
         varDisplay.getChildren().clear();
         varDisplay.getChildren().add(createStackLabel("VARIABLES",varDisplay.getWidth(),30,Color.web("b78bbf")));
 
@@ -222,6 +232,7 @@ public final class CalculatriceView extends Stage{
         return stackDisplay;
     }
     private StackPane createHistItem(Object op, Color c,int index){
+        // Créer un item de l'historique (TextField permettant de modifier la variable)
         TextField t = new TextField(op.toString());
         t.setFont(Font.font("Verdana", 12));
         t.setOnKeyPressed(new EventHandler<KeyEvent>() {
@@ -232,7 +243,7 @@ public final class CalculatriceView extends Stage{
                     try{
                         controller.updateValue(index, value);
                     }catch(Exception e){
-                        System.out.println(e);
+                        alert(e.toString());
                     }
                     printHistorique(controller.getHistToArray());
                     printVar(controller.getVarToArray());
@@ -243,6 +254,7 @@ public final class CalculatriceView extends Stage{
     }
 
     private StackPane createStackItem(Object op, Color c){
+        // Créer un item de la pile (Text simple)
         Text t = new Text(op.toString());
         t.setFont(Font.font("Verdana", 12));
 
@@ -250,6 +262,7 @@ public final class CalculatriceView extends Stage{
     }
 
     private StackPane createVarItem(Map.Entry<String, Token.RecallToken> op, Color c){
+        // Créer un item des variables (TextField permettant de modifier la variable)
         TextField t = new TextField(op.getValue().toString());
         t.setFont(Font.font("Verdana", 12));
         t.setOnKeyPressed(new EventHandler<KeyEvent>() {
@@ -260,7 +273,7 @@ public final class CalculatriceView extends Stage{
                     try{
                         controller.updateVar(op.getKey(),value);
                     }catch(Exception e){
-                        System.out.println(e);
+                        alert(e.toString());
                     }
                     printHistorique(controller.getHistToArray());
                     printVar(controller.getVarToArray());
@@ -284,14 +297,17 @@ public final class CalculatriceView extends Stage{
         type.setBackground(new Background(new BackgroundFill(classCol,CornerRadii.EMPTY,Insets.EMPTY)));
         type.setPadding(new Insets(5,10,5,10));
 
+        // Le type de l'objet stocké
         Text typeText = new Text((op instanceof Token)? ((Token) op).valueClassToString() : op.getClass().getSimpleName());
         typeText.setFont(Font.font ("Verdana", FontWeight.BLACK.BOLD, 12));
         typeText.setFill(Color.WHITE);
         type.getChildren().add(typeText);
 
+        // Le bloc de droite (pour type + icone graph (si graphable))
         HBox rightPart = new HBox(10);
-        rightPart.getChildren().add(type);
+        rightPart.getChildren().addAll(type);
 
+        // Une pane pour la partie de gauche
         BorderPane bPane = new BorderPane();
         bPane.setLeft(text);
         BorderPane.setAlignment(text,Pos.CENTER_LEFT);
@@ -300,10 +316,42 @@ public final class CalculatriceView extends Stage{
         for(Node n : bPane.getChildren()) BorderPane.setMargin(n,new Insets(10));
 
         stackItem.getChildren().addAll(bPane);
-        stackItem.setOnMouseClicked(event -> {
-            updateGraphFromObj(op);
-        });
+        graphItemAction(op,stackItem,c,rightPart);
         return stackItem;
+    }
+
+    private void graphItemAction(Object op, StackPane item, Color c, HBox rightPart){
+        // Une opération retournant comme valeur un entier
+        if(op instanceof Token.OperationToken && ((Token.OperationToken) op).getValue() instanceof Integer){
+            // Lorsque l'on clique, on essaie d'afficher un graph
+            item.setOnMouseClicked(event -> updateGraphFromObj(op));
+            // On récupère les 2 élements avant le token
+            Token[] hist = controller.getHistToArray();
+            for(int i = 0; i < hist.length; i++){
+                if(hist[i] == op){
+                    Token t2 = hist[i - 1];
+                    Token t1 = hist[i - 2];
+                    // Si t1 est une variable libre, et t2 une variable liée ou l'inverse
+                    if ((!(t1 instanceof Token.OperandToken) && t2 instanceof Token.OperandToken)
+                                || !(t2 instanceof Token.OperandToken) && t1 instanceof Token.OperandToken) {
+                        // On affiche une image de graph
+                        InputStream is = getClass().getClassLoader().getResourceAsStream("graph.png");
+                        ImageView imageView = new ImageView( new Image(is));
+                        imageView.setFitWidth(15); imageView.setFitHeight(15);
+
+                        rightPart.getChildren().add(0,imageView);
+
+                        // Et un effet d'hover
+                        item.setOnMouseEntered(event -> {
+                            item.setBackground(new Background(new BackgroundFill(Color.web("c6c6c6"), CornerRadii.EMPTY, Insets.EMPTY)));
+                        });
+                        item.setOnMouseExited(event -> {
+                            item.setBackground(new Background(new BackgroundFill(c, CornerRadii.EMPTY, Insets.EMPTY)));
+                        });
+                    }
+                }
+            }
+        }
     }
 
     private void updateGraphFromObj(Object op){
@@ -315,16 +363,16 @@ public final class CalculatriceView extends Stage{
                 if(hist[i] == op){
                     Token t2 = hist[i - 1];
                     Token t1 = hist[i - 2];
-                    // Si t1 est une variable libre, et t2 une variable liée
-                    if(!(t1 instanceof Token.OperandToken) && t2 instanceof Token.OperandToken){
+                    // t1 variable libre, t2 variable liée
+                    if (!(t1 instanceof Token.OperandToken) && t2 instanceof Token.OperandToken) {
                         updateGraph(x -> (Integer) ((Token.OperationToken) op).getOperation()
-                                        .compute(new Integer[]{(Integer) t2.getValue(),x}),
-                                "x "+((Token.OperationToken) op).getOperationName()+" "+t2.getValue());
+                                        .compute(new Integer[]{(Integer) t2.getValue(), x}),
+                                "x " + ((Token.OperationToken) op).getOperationName() + " " + t2.getValue());
                         // l'inverse
-                    }else if(!(t2 instanceof Token.OperandToken) && t1 instanceof Token.OperandToken){
+                    } else if (!(t2 instanceof Token.OperandToken) && t1 instanceof Token.OperandToken) {
                         updateGraph(x -> (Integer) ((Token.OperationToken) op).getOperation()
                                         .compute(new Integer[]{x, (Integer) t1.getValue()}),
-                                t1.getValue()+" "+((Token.OperationToken) op).getOperationName()+" x");
+                                t1.getValue() + " " + ((Token.OperationToken) op).getOperationName() + " x");
                     }
                 }
             }
