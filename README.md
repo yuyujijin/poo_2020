@@ -18,7 +18,7 @@ L'énnoncé du projet est dans le fichier `projet.pdf`.
 
 ## Comment lancer le projet :
 
-Un script `run` appartient à l'archive du projet, et compile avec maven et
+Un script `run` appartient à l'archive du projet. Il compile avec maven et
 lance la commande java en utilisant l'archive .jar produite.
 Pour lancer le projet, il suffit donc d'éxecuter `./run`.
 
